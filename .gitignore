@@ -1,0 +1,43 @@
+# Python Caches & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+env/
+venv/
+ENV/
+
+# Testing & Type-checking Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local Runtime Data (Single source of truth & derived stores are local-only)
+data/
+*.lock
+
+# IDE & OS Artifacts
+.DS_Store
+.vscode/
+.idea/

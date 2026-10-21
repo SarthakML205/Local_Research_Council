@@ -1,0 +1,16 @@
+# --- Local Research Council Agent Ignore ---
+# Prevent agents from indexing heavy data, vector DBs, and runtime telemetry
+data/papers/**/*.pdf
+data/papers/**/chunks.jsonl
+data/papers/**/sliced_text.txt
+data/qdrant_db/
+data/telemetry/
+data/logs/
+backups/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+dist/
+build/
