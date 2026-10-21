@@ -1,6 +1,7 @@
 """Async arXiv search and non-blocking PDF downloader with network egress guard."""
 
 import logging
+import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import Any
 
@@ -26,17 +27,18 @@ class ArxivClient:
     def _verify_host(self, url: str) -> None:
         """Enforce Zero-Cloud Egress Invariant."""
         for allowed in ALLOWED_HOSTS:
-            if f"://{allowed}" in url or url.startswith(f"http://{allowed}"):
+            if f"://{allowed}" in url or url.startswith(f"http://{allowed}") or url.startswith(f"https://{allowed}"):
                 return
         raise PermissionError(f"NETWORK_GUARD_TRIGGER: External egress to unauthorized host blocked: {url}")
 
     async def search(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
         """Query arXiv Atom feed asynchronously for relevant papers."""
-        url = f"http://{ARXIV_API_HOST}/api/query?search_query=all:{query}&start=0&max_results={max_results}&sortBy=relevance"
+        encoded_query = urllib.parse.quote_plus(query)
+        url = f"https://{ARXIV_API_HOST}/api/query?search_query=all:{encoded_query}&start=0&max_results={max_results}&sortBy=relevance"
         self._verify_host(url)
 
         async def _fetch() -> list[dict[str, Any]]:
-            async with httpx.AsyncClient(timeout=self.timeout_s) as client:
+            async with httpx.AsyncClient(timeout=self.timeout_s, follow_redirects=True) as client:
                 resp = await client.get(url)
                 if resp.status_code != 200:
                     raise RuntimeError(f"arXiv API error {resp.status_code}: {resp.text}")
@@ -75,7 +77,7 @@ class ArxivClient:
                 if c.attrib.get("term")
             ]
 
-            pdf_url = f"http://{ARXIV_API_HOST}/pdf/{arxiv_id}.pdf"
+            pdf_url = f"https://{ARXIV_API_HOST}/pdf/{arxiv_id}.pdf"
             entries.append({
                 "paper_id": arxiv_id,
                 "arxiv_id": arxiv_id,
@@ -99,7 +101,7 @@ class ArxivClient:
                 logger.info(f"Paper {paper_id} already cached locally with verified integrity.")
                 return True
 
-        pdf_url = paper_meta.get("pdf_url") or f"http://{ARXIV_API_HOST}/pdf/{paper_id}.pdf"
+        pdf_url = paper_meta.get("pdf_url") or f"https://{ARXIV_API_HOST}/pdf/{paper_id}.pdf"
         self._verify_host(pdf_url)
 
         async def _stream_download() -> bytes:
