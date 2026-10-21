@@ -7,15 +7,21 @@ import uuid
 from typing import Any, Final
 
 from app.backend.agents.turn_manager import ActiveDebateState, turn_manager
+from app.backend.ingest.chunker import TextChunker
+from app.backend.ingest.extractor import PDFExtractor
 from app.backend.library.library_store import LibraryStore
 from app.backend.library.library_store import library_store as default_lib_store
 from app.backend.library.paper_store import PaperStore
 from app.backend.library.paper_store import paper_store as default_paper_store
+from app.backend.retrieval.qdrant_store import qdrant_store
 from app.backend.telemetry.events import FailureCode, Severity
 from app.backend.telemetry.failure_log import failure_logger
 from app.config import settings
 
 logger: Final = logging.getLogger("app.backend.library.council_launcher")
+
+pdf_extractor: Final[PDFExtractor] = PDFExtractor()
+text_chunker: Final[TextChunker] = TextChunker()
 
 
 class CouncilLauncher:
@@ -32,6 +38,31 @@ class CouncilLauncher:
         self.library_store = library_store_instance or default_lib_store
         self.min_papers = min_papers
         self.max_papers = max_papers
+
+    async def _ensure_qdrant_indexed(self, paper_id: str) -> None:
+        """Guarantee paper chunks are embedded and present in Qdrant before debate."""
+        try:
+            points = await qdrant_store.count_points(paper_id)
+            if points > 0:
+                return
+
+            chunks = await self.paper_store.read_chunks(paper_id)
+            if not chunks:
+                # Sliced text check
+                folder = self.paper_store.get_paper_folder(paper_id)
+                sliced_file = folder / "sliced_text.txt"
+                if sliced_file.exists():
+                    text = sliced_file.read_text(encoding="utf-8")
+                else:
+                    text = await pdf_extractor.slice_paper(paper_id)
+                    await self.paper_store.save_sliced_text(paper_id, text)
+                chunks = text_chunker.chunk_text(paper_id, text)
+                await self.paper_store.save_chunks(paper_id, chunks)
+
+            if chunks:
+                await qdrant_store.index_paper_chunks(paper_id, chunks)
+        except Exception as exc:
+            logger.warning(f"Could not auto-index {paper_id} in Qdrant: {exc}")
 
     async def stage_debate(
         self,
@@ -54,6 +85,7 @@ class CouncilLauncher:
         for pid in paper_ids:
             manifest = await self.paper_store.get_manifest(pid)
             meta = await self.paper_store.read_metadata(pid) or {}
+            await self._ensure_qdrant_indexed(pid)
             staged_papers.append({
                 "paper_id": pid,
                 "title": meta.get("title", pid),

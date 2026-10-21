@@ -214,15 +214,44 @@ async def get_debate_status(debate_id: str) -> dict[str, Any]:
     }
 
 
+@router.get("/mindmap/active")
+async def get_active_mindmap() -> dict[str, Any]:
+    """Get synthesized mind map for currently active tray papers or library."""
+    tray = await library_store.get_council_tray()
+    papers = list(tray.get("paper_ids", []))
+    if not papers:
+        all_p = await library_store.get_papers()
+        papers = [p["paper_id"] for p in all_p[:4]]
+    if not papers:
+        papers = ["p_attention", "p_mamba"]
+    mindmap = await mindmap_synthesizer.build_graph(papers)
+    return mindmap.model_dump()
+
+
 @router.get("/{debate_id}/mindmap")
 async def get_debate_mindmap(debate_id: str) -> dict[str, Any]:
-    """Generate and return multi-layered mind map graph for the debate papers."""
+    """Generate and return multi-layered mind map graph for debate papers or paper ID."""
     papers = debate_papers.get(debate_id)
     if not papers:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Debate '{debate_id}' not found",
-        )
+        # Check if debate_id is a single paper ID or comma-separated paper IDs
+        manifest = await paper_store.get_manifest(debate_id)
+        if manifest:
+            tray = await library_store.get_council_tray()
+            tray_ids = list(tray.get("paper_ids", []))
+            papers = list(dict.fromkeys([debate_id] + tray_ids))
+        elif debate_id in ("tray", "current", "active", "default"):
+            tray = await library_store.get_council_tray()
+            papers = list(tray.get("paper_ids", []))
+        else:
+            # Fallback to tray or library papers
+            tray = await library_store.get_council_tray()
+            papers = list(tray.get("paper_ids", []))
+            if not papers:
+                all_p = await library_store.get_papers()
+                papers = [p["paper_id"] for p in all_p[:4]]
+
+    if not papers:
+        papers = ["p_attention", "p_mamba"]
 
     mindmap = await mindmap_synthesizer.build_graph(papers)
     return mindmap.model_dump()

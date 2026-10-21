@@ -120,16 +120,19 @@ export default function App() {
         setTrayPapers(data);
         if (data.length > 0) {
           loadMindMap(data[0]);
+        } else {
+          loadMindMap('active');
         }
       }
     } catch (err) {
       setTrayPapers(['p_attention', 'p_mamba']);
+      loadMindMap('active');
     }
   };
 
-  const loadMindMap = async (debateId) => {
+  const loadMindMap = async (id = 'active') => {
     try {
-      const res = await fetch(`${API_BASE}/debate/${debateId}/mindmap`);
+      const res = await fetch(`${API_BASE}/debate/${id}/mindmap`);
       if (res.ok) {
         const data = await res.json();
         setGraph(data);

@@ -1,58 +1,125 @@
-import React, { useState } from 'react';
-import { Layers, Sparkles, BookOpen, ExternalLink, ArrowRight, CheckCircle2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Layers, Sparkles, BookOpen, ExternalLink, ArrowRight, CheckCircle2, ShieldCheck, Network, Info } from 'lucide-react';
 
 export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
-  // Fallback demo graph if backend is still initializing
-  const nodes = graph?.nodes || [
-    { id: 'p_attn', label: 'Attention Is All You Need', type: 'paper', study_rank: 1, color: '#38bdf8', summary: 'Multi-head self-attention replaces recurrence entirely.' },
-    { id: 'p_mamba', label: 'Mamba: Linear-Time Sequence Modeling', type: 'paper', study_rank: 2, color: '#a855f7', summary: 'Selective state spaces achieve linear scaling without quadratic attention.' },
-    { id: 'prereq_linalg', label: 'Linear Algebra & Projections', type: 'prerequisite', color: '#10b981', summary: 'Fundamental matrix operations and multi-head projections.' },
-    { id: 'field_hardware', label: 'Hardware-Aware Deep Learning', type: 'field', color: '#f59e0b', summary: 'Kernel IO efficiency and unified memory cache hierarchies.' },
-  ];
+  const nodes = useMemo(() => {
+    if (graph?.nodes && graph.nodes.length > 0) return graph.nodes;
+    return [
+      { id: 'p_attn', label: 'Attention Is All You Need', type: 'paper', study_rank: 1, color: '#38bdf8', summary: 'Multi-head self-attention replaces recurrence entirely.' },
+      { id: 'p_mamba', label: 'Mamba: Linear-Time Sequence Modeling', type: 'paper', study_rank: 2, color: '#a855f7', summary: 'Selective state spaces achieve linear scaling without quadratic attention.' },
+      { id: 'prereq_linalg', label: 'Linear Algebra & Projections', type: 'prerequisite', color: '#10b981', summary: 'Fundamental matrix operations and multi-head projections.' },
+      { id: 'field_hardware', label: 'Hardware-Aware Deep Learning', type: 'field', color: '#f59e0b', summary: 'Kernel IO efficiency and unified memory cache hierarchies.' },
+    ];
+  }, [graph]);
 
-  const edges = graph?.edges || [
-    { id: 'e1', source: 'prereq_linalg', target: 'p_attn', relation: 'prerequisite_for', confidence: 0.95 },
-    { id: 'e2', source: 'p_mamba', target: 'p_attn', relation: 'extends', confidence: 0.88 },
-    { id: 'e3', source: 'p_mamba', target: 'field_hardware', relation: 'subfield_of', confidence: 0.82 },
-  ];
+  const edges = useMemo(() => {
+    if (graph?.edges && graph.edges.length > 0) return graph.edges;
+    return [
+      { id: 'e1', source: 'prereq_linalg', target: 'p_attn', relation: 'prerequisite_for', confidence: 0.95 },
+      { id: 'e2', source: 'p_mamba', target: 'p_attn', relation: 'extends', confidence: 0.88 },
+      { id: 'e3', source: 'p_mamba', target: 'field_hardware', relation: 'subfield_of', confidence: 0.82 },
+    ];
+  }, [graph]);
 
-  // Coordinates mapping for clean force layout simulation
-  const nodePositions = {
-    'p_attn': { x: 280, y: 180 },
-    'p_mamba': { x: 540, y: 260 },
-    'prereq_linalg': { x: 120, y: 320 },
-    'field_hardware': { x: 680, y: 120 },
-  };
+  // Dynamically compute clean, non-overlapping coordinates for any arbitrary graph
+  const nodePositions = useMemo(() => {
+    const positions = {};
+    const width = 860;
+    const height = 580;
 
-  const activeNode = selectedNode || nodes[0];
+    const prerequisites = nodes.filter(n => n.type === 'prerequisite');
+    const papers = nodes.filter(n => n.type === 'paper');
+    const fields = nodes.filter(n => n.type === 'field');
+    const others = nodes.filter(n => !['prerequisite', 'paper', 'field'].includes(n.type));
+
+    // 1. Prerequisites along Top Tier (Y ~ 100-140)
+    prerequisites.forEach((n, idx) => {
+      const step = width / (prerequisites.length + 1);
+      positions[n.id] = {
+        x: Math.round(step * (idx + 1)),
+        y: 110 + (idx % 2 === 0 ? 0 : 35),
+      };
+    });
+
+    // 2. Papers across the Central Hero Tier (Y ~ 270-340)
+    papers.forEach((n, idx) => {
+      const step = width / (papers.length + 1);
+      positions[n.id] = {
+        x: Math.round(step * (idx + 1)),
+        y: 290 + (idx % 2 === 0 ? -25 : 30),
+      };
+    });
+
+    // 3. Fields along Bottom Tier (Y ~ 470-510)
+    fields.forEach((n, idx) => {
+      const step = width / (fields.length + 1);
+      positions[n.id] = {
+        x: Math.round(step * (idx + 1)),
+        y: 480 + (idx % 2 === 0 ? 0 : 30),
+      };
+    });
+
+    // 4. Any remaining nodes
+    others.forEach((n, idx) => {
+      const step = width / (others.length + 1);
+      positions[n.id] = {
+        x: Math.round(step * (idx + 1)),
+        y: 390,
+      };
+    });
+
+    return positions;
+  }, [nodes]);
+
+  const activeNode = nodes.find(n => n.id === selectedNodeId) || nodes.find(n => n.type === 'paper') || nodes[0];
+  const isPaperStaged = activeNode?.type === 'paper' && trayPapers?.includes(activeNode.id);
+
+  // Filter relationships connected to the active node
+  const connectedEdges = edges.filter(e => e.source === activeNode?.id || e.target === activeNode?.id);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '20px', height: 'calc(100vh - 100px)', padding: '0 16px 16px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '20px', height: 'calc(100vh - 100px)', padding: '0 16px 16px' }}>
       {/* Left Canvas: Sci-Fi Mind Map */}
       <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         {/* Pedagogical Study Order Ribbon */}
         <div style={{
-          padding: '12px 20px',
+          padding: '14px 20px',
           borderBottom: '1px solid var(--border-color)',
-          background: 'rgba(0, 0, 0, 0.25)',
+          background: 'rgba(0, 0, 0, 0.3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Layers size={16} color="#38bdf8" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Pedagogical Study Order
+            <Network size={18} color="#38bdf8" />
+            <span style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f8fafc' }}>
+              Pedagogical Curriculum Mind Map
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', maxWidth: '500px' }}>
             {nodes.filter(n => n.type === 'paper').map((p, idx) => (
               <React.Fragment key={p.id}>
-                <span className="badge badge-cyan" style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(p)}>
-                  #{idx + 1} {p.label.slice(0, 16)}...
-                </span>
+                <button
+                  className="badge"
+                  style={{
+                    background: activeNode?.id === p.id ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                    border: activeNode?.id === p.id ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: activeNode?.id === p.id ? '#38bdf8' : '#cbd5e1',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    padding: '4px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                  onClick={() => setSelectedNodeId(p.id)}
+                >
+                  <span style={{ fontWeight: 800 }}>#{idx + 1}</span>
+                  <span>{p.label.length > 20 ? `${p.label.slice(0, 20)}...` : p.label}</span>
+                </button>
                 {idx < nodes.filter(n => n.type === 'paper').length - 1 && (
                   <ArrowRight size={12} color="var(--text-dim)" />
                 )}
@@ -62,90 +129,148 @@ export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
         </div>
 
         {/* Dynamic SVG Mind Map Canvas */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <svg style={{ width: '100%', height: '100%', minHeight: '500px' }}>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'radial-gradient(ellipse at 50% 50%, rgba(15, 23, 42, 0.6) 0%, rgba(3, 7, 18, 0.95) 100%)' }}>
+          <svg
+            viewBox="0 0 860 580"
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          >
             <defs>
-              <linearGradient id="edge-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#a855f7" stopOpacity="0.8" />
+              <linearGradient id="edge-paper-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#a855f7" stopOpacity="0.85" />
               </linearGradient>
-              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
+              <linearGradient id="edge-prereq-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.8" />
+              </linearGradient>
+              <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
               </filter>
             </defs>
 
-            {/* Edges */}
+            {/* Background Grid Pattern */}
+            <g opacity="0.08">
+              {[...Array(9)].map((_, i) => (
+                <line key={`vl-${i}`} x1={i * 100} y1="0" x2={i * 100} y2="580" stroke="#38bdf8" strokeWidth="1" />
+              ))}
+              {[...Array(6)].map((_, i) => (
+                <line key={`hl-${i}`} x1="0" y1={i * 100} x2="860" y2={i * 100} stroke="#38bdf8" strokeWidth="1" />
+              ))}
+            </g>
+
+            {/* Connecting Curved Edges */}
             {edges.map(e => {
-              const src = nodePositions[e.source] || { x: 200, y: 200 };
-              const dst = nodePositions[e.target] || { x: 400, y: 300 };
+              const src = nodePositions[e.source] || { x: 200, y: 150 };
+              const dst = nodePositions[e.target] || { x: 600, y: 350 };
               const midX = (src.x + dst.x) / 2;
-              const midY = (src.y + dst.y) / 2 - 30;
+              const midY = (src.y + dst.y) / 2 - 25;
+              const isSelected = activeNode?.id === e.source || activeNode?.id === e.target;
+
+              const strokeColor = e.relation === 'prerequisite_for' ? 'url(#edge-prereq-grad)' : 'url(#edge-paper-grad)';
 
               return (
-                <g key={e.id}>
+                <g key={e.id} opacity={isSelected ? 1 : 0.65}>
                   <path
                     d={`M ${src.x} ${src.y} Q ${midX} ${midY} ${dst.x} ${dst.y}`}
                     fill="none"
-                    stroke="url(#edge-cyan)"
-                    strokeWidth="2.5"
-                    strokeDasharray={e.relation === 'prerequisite_for' ? '4 4' : 'none'}
-                    filter="url(#glow)"
+                    stroke={strokeColor}
+                    strokeWidth={isSelected ? '3' : '2'}
+                    strokeDasharray={e.relation === 'prerequisite_for' ? '6 4' : 'none'}
+                    filter={isSelected ? 'url(#neon-glow)' : 'none'}
+                  />
+                  {/* Edge Relation Pill */}
+                  <rect
+                    x={midX - 44}
+                    y={midY - 10}
+                    width="88"
+                    height="18"
+                    rx="9"
+                    fill="rgba(15, 23, 42, 0.9)"
+                    stroke="rgba(56, 189, 248, 0.4)"
+                    strokeWidth="1"
                   />
                   <text
                     x={midX}
-                    y={midY}
+                    y={midY + 3}
                     fill="#94a3b8"
-                    fontSize="10"
+                    fontSize="9"
                     fontFamily="var(--font-mono)"
                     textAnchor="middle"
-                    style={{ background: '#07090e', padding: '2px 6px' }}
                   >
-                    {e.relation} ({(e.confidence * 100).toFixed(0)}%)
+                    {e.relation}
                   </text>
                 </g>
               );
             })}
 
-            {/* Nodes */}
+            {/* Render Nodes */}
             {nodes.map(n => {
-              const pos = nodePositions[n.id] || { x: 300, y: 300 };
+              const pos = nodePositions[n.id] || { x: 430, y: 290 };
               const isSelected = activeNode?.id === n.id;
+              const isPaper = n.type === 'paper';
+              const isPrereq = n.type === 'prerequisite';
+
+              const radius = isPaper ? 28 : (isPrereq ? 20 : 18);
+              const baseColor = n.color || (isPaper ? '#38bdf8' : (isPrereq ? '#10b981' : '#f59e0b'));
 
               return (
                 <g
                   key={n.id}
                   transform={`translate(${pos.x}, ${pos.y})`}
+                  onClick={() => setSelectedNodeId(n.id)}
                   style={{ cursor: 'pointer' }}
-                  onClick={() => setSelectedNode(n)}
                 >
+                  {/* Outer Pulsing Halo when selected */}
+                  {isSelected && (
+                    <circle
+                      r={radius + 12}
+                      fill="none"
+                      stroke={baseColor}
+                      strokeWidth="2"
+                      opacity="0.5"
+                      filter="url(#neon-glow)"
+                    />
+                  )}
+
+                  {/* Node Background Disc */}
                   <circle
-                    r={isSelected ? 32 : 26}
-                    fill="#0f172a"
-                    stroke={n.color}
-                    strokeWidth={isSelected ? 3 : 2}
-                    filter="url(#glow)"
-                    style={{ transition: 'all 0.3s' }}
+                    r={radius}
+                    fill="rgba(15, 23, 42, 0.95)"
+                    stroke={baseColor}
+                    strokeWidth={isSelected ? '3' : '2'}
                   />
+
+                  {/* Inner Node Accent */}
+                  <circle
+                    r={radius - 6}
+                    fill={baseColor}
+                    opacity={isSelected ? 0.35 : 0.15}
+                  />
+
+                  {/* Icon / Glyph */}
                   <text
-                    textAnchor="middle"
-                    dy="4"
-                    fill={n.color}
-                    fontSize={isSelected ? '14' : '12'}
-                    fontWeight="800"
-                    fontFamily="var(--font-display)"
-                  >
-                    {n.type === 'paper' ? `P${n.study_rank || 1}` : n.type === 'prerequisite' ? 'PR' : 'FL'}
-                  </text>
-                  <text
-                    textAnchor="middle"
-                    dy="45"
-                    fill="#f1f5f9"
-                    fontSize="11"
-                    fontWeight="600"
+                    y="4"
+                    fill="#ffffff"
+                    fontSize={isPaper ? '12' : '10'}
                     fontFamily="var(--font-sans)"
+                    fontWeight="800"
+                    textAnchor="middle"
                   >
-                    {n.label.length > 24 ? n.label.slice(0, 22) + '...' : n.label}
+                    {isPaper ? `P${n.study_rank || ''}` : (isPrereq ? 'REQ' : 'FLD')}
+                  </text>
+
+                  {/* Node Label Text */}
+                  <text
+                    y={radius + 18}
+                    fill={isSelected ? '#ffffff' : '#cbd5e1'}
+                    fontSize="11"
+                    fontFamily="var(--font-sans)"
+                    fontWeight={isSelected ? '700' : '500'}
+                    textAnchor="middle"
+                    style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                  >
+                    {n.label.length > 28 ? `${n.label.slice(0, 26)}...` : n.label}
                   </text>
                 </g>
               );
@@ -154,82 +279,97 @@ export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
         </div>
       </div>
 
-      {/* Right Panel: Modular 8-Tile Paper HUD */}
+      {/* Right Rail: Interactive Node Dossier */}
       <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <span className="badge badge-cyan" style={{ marginBottom: '4px' }}>
-              {activeNode.type.toUpperCase()} INSPECTOR
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span
+              className="badge"
+              style={{
+                background: `${activeNode?.color || '#38bdf8'}22`,
+                borderColor: activeNode?.color || '#38bdf8',
+                color: activeNode?.color || '#38bdf8',
+                fontSize: '0.75rem',
+                textTransform: 'uppercase',
+                fontWeight: 700,
+              }}
+            >
+              {activeNode?.type || 'Node'}
             </span>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800 }}>{activeNode.label}</h3>
+            {activeNode?.study_rank && (
+              <span className="badge badge-cyan" style={{ fontSize: '0.7rem' }}>
+                Study Step #{activeNode.study_rank}
+              </span>
+            )}
           </div>
-          {activeNode.type === 'paper' && (
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', lineHeight: '1.4' }}>
+            {activeNode?.label}
+          </h3>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Node Summary */}
+          <div>
+            <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '8px' }}>
+              Synthesized Thesis / Concept
+            </h4>
+            <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+              {activeNode?.summary || 'Core academic contribution within the synthesized curriculum graph.'}
+            </p>
+          </div>
+
+          {/* Graph Relationships */}
+          <div>
+            <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '10px' }}>
+              Connected Relationships ({connectedEdges.length})
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {connectedEdges.map(e => {
+                const otherId = e.source === activeNode?.id ? e.target : e.source;
+                const otherNode = nodes.find(n => n.id === otherId);
+                const isOutgoing = e.source === activeNode?.id;
+
+                return (
+                  <div
+                    key={e.id}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span className="badge badge-violet" style={{ fontSize: '0.65rem' }}>
+                        {e.relation}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: '#10b981', fontFamily: 'var(--font-mono)' }}>
+                        {Math.round((e.confidence || 0.85) * 100)}% match
+                      </span>
+                    </div>
+                    <p style={{ color: '#f8fafc', fontWeight: 600 }}>
+                      {isOutgoing ? '↳ ' : '↰ '} {otherNode?.label || otherId}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        {activeNode?.type === 'paper' && (
+          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.3)' }}>
             <button
-              className="btn-primary"
-              style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+              className={isPaperStaged ? 'btn-secondary' : 'btn-primary'}
+              style={{ width: '100%', fontSize: '0.85rem' }}
               onClick={() => onStageToTray(activeNode.id)}
             >
-              {trayPapers?.includes(activeNode.id) ? (
-                <>
-                  <CheckCircle2 size={14} /> Staged in Council
-                </>
-              ) : (
-                'Stage in Council'
-              )}
+              {isPaperStaged ? '✓ Staged in Council Tray' : '+ Stage in Council Tray'}
             </button>
-          )}
-        </div>
-
-        {/* 8 Modular Tiles Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Tile 1: TLDR & Study Rank */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 700, textTransform: 'uppercase' }}>Tile 1: TLDR & Rank</span>
-            <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-              {activeNode.summary || 'Grounding findings indicate superior scaling throughput without cache memory degradation.'}
-            </p>
           </div>
-
-          {/* Tile 2: Core Problem Statement */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.7rem', color: '#f43f5e', fontWeight: 700, textTransform: 'uppercase' }}>Tile 2: Core Problem</span>
-            <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-              Overcoming the quadratic $O(N^2)$ computational and memory bottleneck in multi-head attention on unified memory.
-            </p>
-          </div>
-
-          {/* Tile 3: Methodology & Architecture */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 700, textTransform: 'uppercase' }}>Tile 3: Methodology</span>
-            <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-              Selective state-space parameters dynamically modulated by current input tokens, implemented via hardware-aware scan kernels.
-            </p>
-          </div>
-
-          {/* Tile 4: Key Quantitative Results */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 700, textTransform: 'uppercase' }}>Tile 4: Quantitative Results</span>
-            <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-              5x higher throughput compared to standard Transformers, constant memory decoding footprint across 100k+ token contexts.
-            </p>
-          </div>
-
-          {/* Tile 5: Significance */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.7rem', color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase' }}>Tile 5: Significance</span>
-            <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-              Demonstrates that recurrent linear scaling matches or exceeds dense attention quality when selection dynamics are hardware-aligned.
-            </p>
-          </div>
-
-          {/* Tile 6: Research Gaps */}
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase' }}>Tile 7: Admitted Gaps</span>
-            <p style={{ fontSize: '0.85rem', marginTop: '4px' }}>
-              Requires fast SRAM cache buffers; continuous associative recall can regress on synthetic needle-in-haystack lookups.
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -36,7 +36,13 @@ class QdrantStore:
                 self._client = AsyncQdrantClient(url=self.server_url, prefer_grpc=True)
             else:
                 self.storage_path.mkdir(parents=True, exist_ok=True)
-                self._client = AsyncQdrantClient(path=str(self.storage_path))
+                try:
+                    self._client = AsyncQdrantClient(path=str(self.storage_path))
+                except Exception as exc:
+                    logger.warning(
+                        f"Local Qdrant storage path locked ({exc}); falling back to ephemeral in-memory client."
+                    )
+                    self._client = AsyncQdrantClient(location=":memory:")
         return self._client
 
     def get_collection_name(self, paper_id: str) -> str:

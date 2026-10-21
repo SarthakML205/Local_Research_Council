@@ -10,6 +10,7 @@ import logging
 from typing import Any, Final
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.api.stream import broadcaster
@@ -20,6 +21,7 @@ from app.backend.ingest.extractor import PDFExtractor
 from app.backend.library.inbox_watcher import InboxWatcher
 from app.backend.library.library_store import LibraryStore
 from app.backend.library.paper_store import PaperStore
+from app.backend.retrieval.qdrant_store import qdrant_store
 
 logger: Final = logging.getLogger(__name__)
 
@@ -64,7 +66,7 @@ async def list_papers() -> list[dict[str, Any]]:
 
 @router.get("/papers/{paper_id}")
 async def get_paper(paper_id: str) -> dict[str, Any]:
-    """Retrieve complete paper bundle: metadata, manifest, and extraction."""
+    """Retrieve complete paper bundle: metadata, manifest, extraction, text, and chunks."""
     manifest = await paper_store.read_manifest(paper_id)
     if not manifest:
         raise HTTPException(
@@ -73,12 +75,49 @@ async def get_paper(paper_id: str) -> dict[str, Any]:
         )
     metadata = await paper_store.read_metadata(paper_id)
     extraction = await paper_store.read_extraction(paper_id)
+    chunks = await paper_store.read_chunks(paper_id)
+
+    # Read sliced text snippet
+    folder = paper_store.get_paper_folder(paper_id)
+    sliced_text_file = folder / "sliced_text.txt"
+    sliced_text = ""
+    if sliced_text_file.exists():
+        try:
+            sliced_text = sliced_text_file.read_text(encoding="utf-8")
+        except Exception:
+            pass
+
     return {
         "paper_id": paper_id,
-        "metadata": metadata,
+        "metadata": metadata or {},
         "manifest": manifest,
-        "extraction": extraction,
+        "extraction": extraction or {},
+        "sliced_text": sliced_text,
+        "chunks": chunks,
+        "chunk_count": len(chunks),
     }
+
+
+@router.get("/papers/{paper_id}/pdf")
+async def get_paper_pdf(paper_id: str) -> FileResponse:
+    """Stream raw PDF binary for embedded reading."""
+    pdf_path = paper_store.get_paper_folder(paper_id) / "paper.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"PDF for paper '{paper_id}' not found on disk",
+        )
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=f"{paper_id}.pdf",
+    )
+
+
+@router.get("/papers/{paper_id}/chunks")
+async def get_paper_chunks(paper_id: str) -> list[dict[str, Any]]:
+    """Retrieve indexed chunks with token counts and section names."""
+    return await paper_store.read_chunks(paper_id)
 
 
 @router.post("/arxiv/fetch")
@@ -104,11 +143,19 @@ async def fetch_arxiv_paper(req: ArxivFetchRequest) -> dict[str, Any]:
 
     # 3. Slice first 6-8 pages and clean text
     clean_text = await pdf_extractor.slice_paper(p_id)
+    await paper_store.save_sliced_text(p_id, clean_text)
 
     # 4. Chunk text into 256-512 token windows
     chunks = text_chunker.chunk_text(p_id, clean_text)
+    await paper_store.save_chunks(p_id, chunks)
 
-    # 5. Index in LibraryStore
+    # 5. Embed and Index in Qdrant Vector Store
+    try:
+        await qdrant_store.index_paper_chunks(p_id, chunks)
+    except Exception as exc:
+        logger.warning(f"Qdrant indexing deferred for {p_id}: {exc}")
+
+    # 6. Index in LibraryStore
     await library_store.upsert_paper({
         "paper_id": p_id,
         "title": paper_meta.get("title", p_id),
@@ -181,7 +228,14 @@ async def start_research_session(req: ResearchSessionRequest) -> dict[str, Any]:
         })
         try:
             clean_text = await pdf_extractor.slice_paper(p_id)
+            await paper_store.save_sliced_text(p_id, clean_text)
             chunks = text_chunker.chunk_text(p_id, clean_text)
+            await paper_store.save_chunks(p_id, chunks)
+            # Embed and Index in Qdrant Vector Store
+            try:
+                await qdrant_store.index_paper_chunks(p_id, chunks)
+            except Exception as q_exc:
+                logger.warning(f"Qdrant indexing deferred for {p_id}: {q_exc}")
         except Exception:
             chunks = []
 
