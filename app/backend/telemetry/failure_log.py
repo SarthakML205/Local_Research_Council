@@ -125,6 +125,36 @@ class FailureLogger:
 failure_logger = FailureLogger()
 
 
+class FailureLogStore:
+    """Convenience accessor for querying and logging typed failure records."""
+
+    def __init__(self, log_dir: Path | None = None) -> None:
+        self.logger = FailureLogger(fallback_log_path=(log_dir or settings.LOGS_DIR) / "fallback.jsonl")
+
+    async def log_failure(
+        self,
+        code: FailureCode,
+        message: str,
+        severity: Severity = Severity.ERROR,
+        component: str = "core",
+        **kwargs: Any,
+    ) -> FailureRecord:
+        return await self.logger.log_failure(
+            code=code,
+            message=message,
+            severity=severity,
+            component=component,
+            **kwargs,
+        )
+
+    async def get_recent_failures(self, limit: int = 50) -> list[dict[str, Any]]:
+        records = await telemetry_store.read_failures()
+        return records[-limit:]
+
+
+failure_store = FailureLogStore()
+
+
 def setup_global_exception_handlers(loop: asyncio.AbstractEventLoop | None = None) -> None:
     """Install global exception hooks for sys and asyncio event loop."""
 

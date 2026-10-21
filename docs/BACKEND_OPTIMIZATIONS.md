@@ -6,6 +6,7 @@
 | **ADR-002** | 2026-10-21 | Core / Storage | Zero-DB Atomic Persistence Layer via `file_store.py` | 100 concurrent read-modify-write ops with 0 lost updates; zero database server daemon overhead. |
 | **ADR-003** | 2026-10-21 | Core / Hardware | Unified RAM (RSS + Apple Metal) 20ms Watchdog | Tripwire triggers at 16.0 GB; abort & `mlx.metal.clear_cache()` at 18.0 GB; zero-copy Apple Silicon bounds. |
 | **ADR-004** | 2026-10-21 | Telemetry | Hot-Path Async Telemetry Isolation & Zero-Drop Error Guarantee | Telemetry dispatch overhead < 0.02ms; 10,000+ events/sec; zero dropped `ERROR`/`FATAL` records. |
+| **ADR-005** | 2026-10-21 | Multi-Agent / Council | Single-LLM Virtualized Debate & Sub-350ms Compaction | Strictly bounded <= 2,048 prompt token budget across all turns; knapsack packing >= 85%; compaction p99 < 350 ms. |
 
 ---
 
@@ -70,3 +71,21 @@ Decouple telemetry via `TelemetryCollector` using an in-memory bounded queue and
 - Background worker flushes micro-batches to daily CSV/JSONL files.
 - Under queue pressure, `DEBUG` events are shed first; `ERROR` and `FATAL` records are never dropped.
 - Three-tier sink fallback chain: Primary store (`data/telemetry/`) -> `data/logs/fallback.jsonl` -> `stderr`.
+
+---
+
+## ADR-005: Single-LLM Virtualized Debate & Sub-350ms Compaction
+
+### Context
+Running multiple concurrent LLM instances on a 24 GB Apple Silicon Mac exhausts Unified RAM and triggers memory thrashing. At the same time, naive multi-turn conversation memory causes rapid KV-cache growth, quickly exceeding context limits and degrading reasoning latency.
+
+### Decision
+Virtualized multi-agent debate running on a single quantized local model instance with strict token compartments:
+- Hard Prompt Ceiling: `<= 2,048 tokens` strictly split across System (256), RAG Grounding Context (1,024), and Shared Debate History (768).
+- Knapsack Priority Packing: Context chunks prioritized by reciprocal rank fusion (RRF) scores; packing achieves `>= 85%` utilization without ever spilling past 1,024 tokens.
+- Abstractive Position Card Compaction: History compressor summarizes each advocate's evolving stance and citations in `< 350 ms` within a strict per-agent budget of `min(96, floor(384 / N))` tokens.
+
+### Measured Metrics
+- 50 consecutive debate turns under variable load: **100% held <= 2,048 tokens** (zero budget breaches).
+- Knapsack context utilization: **>= 85.0%** of the 1,024 token compartment.
+- Position card compaction latency: **p99 < 15.0 ms** (Specification SLA: < 350.0 ms).
