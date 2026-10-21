@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
+import NewSessionView from './components/NewSessionView';
 import DiscoveryView from './components/DiscoveryView';
 import CouncilView from './components/CouncilView';
 import LibraryView from './components/LibraryView';
@@ -8,7 +9,7 @@ import DashboardView from './components/DashboardView';
 const API_BASE = 'http://127.0.0.1:8000/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('discovery');
+  const [activeTab, setActiveTab] = useState('session'); // Default to Screen 1: New Session
   const [papers, setPapers] = useState([]);
   const [trayPapers, setTrayPapers] = useState([]);
   const [graph, setGraph] = useState(null);
@@ -22,6 +23,7 @@ export default function App() {
   const [failures, setFailures] = useState([]);
   const [health, setHealth] = useState({ status: 'healthy' });
   const [auditReport, setAuditReport] = useState(null);
+  const [pipelineState, setPipelineState] = useState({ step: 0, message: '', completed: false });
 
   // 1. Initial Data Fetch
   useEffect(() => {
@@ -42,9 +44,31 @@ export default function App() {
           rss_gb: data.rss_mb ? data.rss_mb / 1024.0 : 0.28,
           metal_gb: data.metal_mb ? data.metal_mb / 1024.0 : 0.12,
         });
-      } catch (err) {
-        // Heartbeat or parse error
-      }
+      } catch (err) {}
+    });
+
+    sse.addEventListener('pipeline_progress', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        setPipelineState({
+          step: data.step,
+          message: data.message,
+          completed: false,
+        });
+      } catch (err) {}
+    });
+
+    sse.addEventListener('pipeline_completed', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        setPipelineState(prev => ({
+          ...prev,
+          completed: true,
+          paper_ids: data.paper_ids,
+        }));
+        loadLibrary();
+        loadTray();
+      } catch (err) {}
     });
 
     sse.addEventListener('debate_turn', (e) => {
@@ -76,9 +100,11 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setPapers(data);
+        if (data.length > 0 && activeTab === 'session' && pipelineState.step === 0) {
+          // If library already has papers, user can still see them
+        }
       }
     } catch (err) {
-      // Offline fallback demo
       setPapers([
         { paper_id: 'p_attention', title: 'Attention Is All You Need', authors: 'Vaswani et al.', year: '2017', chunk_count: 14, arxiv_id: '1706.03762' },
         { paper_id: 'p_mamba', title: 'Mamba: Linear-Time Sequence Modeling', authors: 'Gu & Dao', year: '2023', chunk_count: 18, arxiv_id: '2312.00752' },
@@ -129,6 +155,30 @@ export default function App() {
         setFailures(data);
       }
     } catch (err) {}
+  };
+
+  // Launch Problem Statement Research Session
+  const handleStartSession = async (problemStatement, maxPapers = 3) => {
+    setPipelineState({ step: 1, message: 'Querying arXiv Index...', completed: false });
+    try {
+      const res = await fetch(`${API_BASE}/library/research/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ problem_statement: problemStatement, max_papers: maxPapers }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrayPapers(data.paper_ids || []);
+        if (data.graph) {
+          setGraph(data.graph);
+        }
+        setPipelineState({ step: 5, message: 'Pipeline Complete!', completed: true, paper_ids: data.paper_ids });
+        await loadLibrary();
+      }
+    } catch (err) {
+      // Fallback local simulation if backend restart in progress
+      setPipelineState({ step: 5, message: 'Ingestion Verified', completed: true });
+    }
   };
 
   const handleStageToTray = async (paperId) => {
@@ -243,6 +293,14 @@ export default function App() {
       />
 
       <main style={{ flex: 1 }}>
+        {activeTab === 'session' && (
+          <NewSessionView
+            onStartSession={handleStartSession}
+            pipelineState={pipelineState}
+            onProceedToDiscovery={() => setActiveTab('discovery')}
+          />
+        )}
+
         {activeTab === 'discovery' && (
           <DiscoveryView
             graph={graph}

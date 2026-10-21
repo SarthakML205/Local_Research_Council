@@ -1,5 +1,5 @@
 import React from 'react';
-import { Network, Users, BookOpen, Activity, ShieldCheck, Cpu } from 'lucide-react';
+import { Network, Users, BookOpen, Activity, ShieldCheck, Sparkles, Plus } from 'lucide-react';
 
 export default function Navigation({ activeTab, setActiveTab, health, memoryMb, errorCount }) {
   // Determine LED status
@@ -55,6 +55,7 @@ export default function Navigation({ activeTab, setActiveTab, health, memoryMb, 
       {/* Navigation Tabs */}
       <nav style={{ display: 'flex', gap: '8px' }}>
         {[
+          { id: 'session', label: 'New Session', icon: Sparkles, highlight: true },
           { id: 'discovery', label: 'Discovery Mind Map', icon: Network },
           { id: 'council', label: 'Council Chamber', icon: Users },
           { id: 'library', label: 'Library Bookshelf', icon: BookOpen },
@@ -73,8 +74,12 @@ export default function Navigation({ activeTab, setActiveTab, health, memoryMb, 
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                background: isActive ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                color: isActive ? '#38bdf8' : 'var(--text-muted)',
+                background: isActive
+                  ? 'rgba(56, 189, 248, 0.15)'
+                  : tab.highlight
+                  ? 'rgba(56, 189, 248, 0.05)'
+                  : 'transparent',
+                color: isActive ? '#38bdf8' : tab.highlight ? '#7dd3fc' : 'var(--text-muted)',
                 fontWeight: isActive ? 700 : 500,
                 fontSize: '0.875rem',
                 cursor: 'pointer',
@@ -94,7 +99,7 @@ export default function Navigation({ activeTab, setActiveTab, health, memoryMb, 
         })}
       </nav>
 
-      {/* Physics Health LED & Memory Tripwire */}
+      {/* Physics Health LED & Action Button */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div style={{
           display: 'flex',
@@ -120,6 +125,16 @@ export default function Navigation({ activeTab, setActiveTab, health, memoryMb, 
           </span>
           <span style={{ color: 'var(--text-dim)' }}>/ 18.0 GB</span>
         </div>
+
+        {activeTab !== 'session' && (
+          <button
+            className="btn-primary"
+            style={{ padding: '8px 14px', fontSize: '0.8rem' }}
+            onClick={() => setActiveTab('session')}
+          >
+            <Plus size={14} /> New Query
+          </button>
+        )}
       </div>
     </header>
   );

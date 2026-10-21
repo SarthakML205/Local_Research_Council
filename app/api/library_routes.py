@@ -12,6 +12,8 @@ from typing import Any, Final
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.api.stream import broadcaster
+from app.backend.graph.mindmap_synthesizer import mindmap_synthesizer
 from app.backend.ingest.arxiv_client import ArxivClient
 from app.backend.ingest.chunker import TextChunker
 from app.backend.ingest.extractor import PDFExtractor
@@ -32,6 +34,11 @@ inbox_watcher: Final[InboxWatcher] = InboxWatcher(
     paper_store_instance=paper_store,
     library_store_instance=library_store,
 )
+
+
+class ResearchSessionRequest(BaseModel):
+    problem_statement: str = Field(..., description="Research question, problem statement, or technical doubt")
+    max_papers: int = Field(default=3, ge=2, le=6)
 
 
 class ArxivFetchRequest(BaseModel):
@@ -116,6 +123,110 @@ async def fetch_arxiv_paper(req: ArxivFetchRequest) -> dict[str, Any]:
         "paper_id": p_id,
         "title": paper_meta.get("title", p_id),
         "chunk_count": len(chunks),
+    }
+
+
+@router.post("/research/session")
+async def start_research_session(req: ResearchSessionRequest) -> dict[str, Any]:
+    """Screen 1: Accept problem statement, query arXiv, download, slice, index, and stage papers."""
+    # 1. Pipeline stage: Querying arXiv index
+    await broadcaster.publish("pipeline_progress", {
+        "stage": "querying_arxiv",
+        "message": f"Querying arXiv Index for: '{req.problem_statement}'",
+        "step": 1,
+        "total_steps": 5,
+    })
+
+    results = await arxiv_client.search(req.problem_statement, max_results=req.max_papers)
+    if not results:
+        # Fallback query with broader terms if exact doubt produced 0 hits
+        simplified_query = " ".join(req.problem_statement.split()[:4])
+        results = await arxiv_client.search(simplified_query, max_results=req.max_papers)
+
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No matching arXiv papers found for query: '{req.problem_statement}'",
+        )
+
+    staged_paper_ids: list[str] = []
+    staged_papers_info: list[dict[str, Any]] = []
+
+    # 2. Process each paper through the sovereign pipeline
+    for idx, paper_meta in enumerate(results):
+        p_id = paper_meta["paper_id"]
+        title = paper_meta.get("title", p_id)
+        staged_paper_ids.append(p_id)
+
+        # Stage 2: Streaming PDF to disk
+        await broadcaster.publish("pipeline_progress", {
+            "stage": "streaming_pdf",
+            "message": f"[{idx+1}/{len(results)}] Streaming PDF to Disk: {title[:50]}...",
+            "step": 2,
+            "total_steps": 5,
+            "paper_id": p_id,
+        })
+        try:
+            await arxiv_client.download_paper(paper_meta)
+        except Exception as exc:
+            logger.warning(f"Download issue for {p_id}: {exc}")
+
+        # Stage 3: Slicing high-density pages
+        await broadcaster.publish("pipeline_progress", {
+            "stage": "slicing_pages",
+            "message": f"[{idx+1}/{len(results)}] Slicing High-Density Pages: {p_id}",
+            "step": 3,
+            "total_steps": 5,
+            "paper_id": p_id,
+        })
+        try:
+            clean_text = await pdf_extractor.slice_paper(p_id)
+            chunks = text_chunker.chunk_text(p_id, clean_text)
+        except Exception:
+            chunks = []
+
+        # Index paper
+        await library_store.upsert_paper({
+            "paper_id": p_id,
+            "title": title,
+            "authors": paper_meta.get("authors", []),
+            "year": paper_meta.get("published", "")[:4],
+            "arxiv_id": paper_meta.get("arxiv_id", p_id),
+            "chunk_count": len(chunks),
+        })
+
+        staged_papers_info.append({
+            "paper_id": p_id,
+            "title": title,
+            "authors": paper_meta.get("authors", []),
+            "chunk_count": len(chunks),
+        })
+
+    # Stage 4: Stage in Council Tray
+    await library_store.update_council_tray(staged_paper_ids, prompt=req.problem_statement)
+
+    # Stage 5: Synthesize Knowledge Graph
+    await broadcaster.publish("pipeline_progress", {
+        "stage": "synthesizing_mindmap",
+        "message": f"Synthesizing Knowledge Graph across {len(staged_paper_ids)} papers...",
+        "step": 5,
+        "total_steps": 5,
+    })
+
+    graph = await mindmap_synthesizer.build_graph(staged_paper_ids)
+
+    await broadcaster.publish("pipeline_completed", {
+        "problem_statement": req.problem_statement,
+        "paper_ids": staged_paper_ids,
+        "status": "ready",
+    })
+
+    return {
+        "status": "completed",
+        "problem_statement": req.problem_statement,
+        "paper_ids": staged_paper_ids,
+        "papers": staged_papers_info,
+        "graph": graph.model_dump(),
     }
 
 
