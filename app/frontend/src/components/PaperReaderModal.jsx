@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, BookOpen, FileText, Layers, FileCode, ExternalLink, Plus, CheckCircle, Search, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
+import { X, BookOpen, FileText, Layers, FileCode, ExternalLink, Plus, CheckCircle, Search, ZoomIn, ZoomOut, Sparkles, AlertCircle, ShieldAlert, Users, TrendingUp, Download } from 'lucide-react';
 
-const API_BASE = '/api';
+const API_BASE = window.location.port === '5173' ? 'http://127.0.0.1:8000/api' : '/api';
 
 export default function PaperReaderModal({ paperId, onClose, onStageToTray, isStaged }) {
   const [activeTab, setActiveTab] = useState('executive'); // 'executive' | 'text' | 'chunks' | 'pdf'
@@ -45,6 +45,7 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
   const authors = Array.isArray(metadata.authors) ? metadata.authors.join(', ') : (metadata.authors || 'Unknown Authors');
   const year = metadata.year || (metadata.published ? metadata.published.slice(0, 4) : '2026');
   const arxivId = metadata.arxiv_id || (paperId.includes('v') ? paperId : null);
+  const pdfDirectUrl = `${API_BASE}/library/papers/${paperId}/pdf`;
 
   const filteredChunks = textFilter.trim()
     ? chunks.filter(c => c.text?.toLowerCase().includes(textFilter.toLowerCase()) || c.section_title?.toLowerCase().includes(textFilter.toLowerCase()))
@@ -58,13 +59,13 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(3, 7, 18, 0.85)',
-        backdropFilter: 'blur(16px)',
+        backgroundColor: 'rgba(3, 7, 18, 0.88)',
+        backdropFilter: 'blur(20px)',
         zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px',
+        padding: '20px',
         animation: 'fadeIn 0.2s ease-out',
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
@@ -72,28 +73,28 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
       <div
         className="glass-panel"
         style={{
-          width: '95vw',
-          maxWidth: '1280px',
-          height: '90vh',
+          width: '96vw',
+          maxWidth: '1320px',
+          height: '92vh',
           display: 'flex',
           flexDirection: 'column',
           borderRadius: '16px',
-          border: '1px solid rgba(56, 189, 248, 0.3)',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 40px rgba(56, 189, 248, 0.15)',
+          border: '1px solid rgba(56, 189, 248, 0.35)',
+          boxShadow: '0 30px 70px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(56, 189, 248, 0.15)',
           overflow: 'hidden',
-          background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(3, 7, 18, 0.98) 100%)',
+          background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(3, 7, 18, 0.99) 100%)',
         }}
       >
         {/* Header Bar */}
         <div
           style={{
-            padding: '18px 24px',
+            padding: '16px 24px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'space-between',
             gap: '20px',
-            background: 'rgba(0, 0, 0, 0.3)',
+            background: 'rgba(0, 0, 0, 0.4)',
           }}
         >
           <div style={{ flex: 1 }}>
@@ -107,6 +108,11 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
               <span className="badge badge-emerald" style={{ fontSize: '0.7rem' }}>
                 <CheckCircle size={11} style={{ marginRight: '4px' }} /> SHA-256 Verified
               </span>
+              {metadata.categories && (
+                <span className="badge badge-violet" style={{ fontSize: '0.7rem' }}>
+                  {Array.isArray(metadata.categories) ? metadata.categories.join(' · ') : metadata.categories}
+                </span>
+              )}
             </div>
 
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', lineHeight: '1.4' }}>
@@ -177,7 +183,7 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
             justifyContent: 'space-between',
             padding: '0 24px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            background: 'rgba(0, 0, 0, 0.2)',
+            background: 'rgba(0, 0, 0, 0.25)',
           }}
         >
           <div style={{ display: 'flex', gap: '4px' }}>
@@ -197,7 +203,7 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
                 cursor: 'pointer',
               }}
             >
-              <Sparkles size={16} /> Executive Extraction
+              <Sparkles size={16} /> Detailed Technical Dossier
             </button>
 
             <button
@@ -216,7 +222,7 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
                 cursor: 'pointer',
               }}
             >
-              <FileText size={16} /> Sliced Academic Text
+              <FileText size={16} /> High-Density Academic Text
             </button>
 
             <button
@@ -235,7 +241,7 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
                 cursor: 'pointer',
               }}
             >
-              <Layers size={16} /> RAG Chunks ({chunks.length})
+              <Layers size={16} /> RAG Grounding Chunks ({chunks.length})
             </button>
 
             <button
@@ -296,9 +302,23 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
                   padding: '4px 10px',
                   color: '#fff',
                   fontSize: '0.8rem',
-                  width: '200px',
+                  width: '220px',
                 }}
               />
+            </div>
+          )}
+
+          {activeTab === 'pdf' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <a
+                href={pdfDirectUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary"
+                style={{ fontSize: '0.75rem', padding: '4px 12px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <ExternalLink size={13} /> Open in Dedicated Window
+              </a>
             </div>
           )}
         </div>
@@ -307,132 +327,211 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px', position: 'relative' }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', gap: '12px' }}>
-              <div style={{ width: '24px', height: '24px', borderRadius: '50%', border: '2px solid #38bdf8', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
-              <span>Loading paper dossier...</span>
+              <div style={{ width: '26px', height: '26px', borderRadius: '50%', border: '2px solid #38bdf8', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontSize: '0.9rem' }}>Extracting deep technical dossier from sovereign store...</span>
             </div>
           ) : (
             <>
-              {/* TAB 1: EXECUTIVE EXTRACTION */}
+              {/* TAB 1: DETAILED TECHNICAL DOSSIER */}
               {activeTab === 'executive' && (
-                <div style={{ maxWidth: '960px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  {/* TL;DR Highlight */}
+                <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+                  {/* Executive TL;DR Banner */}
                   <div
                     style={{
                       background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%)',
-                      border: '1px solid rgba(56, 189, 248, 0.3)',
-                      borderRadius: '12px',
-                      padding: '20px 24px',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      borderRadius: '14px',
+                      padding: '22px 26px',
+                      boxShadow: '0 10px 30px -10px rgba(56, 189, 248, 0.2)',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                       <Sparkles size={18} color="#38bdf8" />
-                      <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Executive TL;DR
+                      <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Executive Summary &amp; Core Discovery
                       </h3>
                     </div>
-                    <p style={{ fontSize: '1.05rem', lineHeight: '1.6', color: '#f8fafc', fontWeight: 500 }}>
-                      {extraction.tldr || metadata.summary || 'Rigorous empirical evaluation and theoretical formulation of state-of-the-art architectures.'}
+                    <p style={{ fontSize: '1.05rem', lineHeight: '1.7', color: '#f8fafc', fontWeight: 500 }}>
+                      {extraction.tldr || metadata.summary}
                     </p>
                   </div>
 
-                  {/* Problem & Methodology Grid */}
+                  {/* Problem & Methodology Dual Column */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                     <div
                       style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'rgba(244, 63, 94, 0.04)',
+                        border: '1px solid rgba(244, 63, 94, 0.25)',
                         borderRadius: '12px',
                         padding: '20px',
                       }}
                     >
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f43f5e', marginBottom: '8px' }}>
-                        Core Problem Statement
-                      </h4>
-                      <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#cbd5e1' }}>
-                        {extraction.problem_statement || 'Computational complexity and memory footprint limits during long-sequence model execution.'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <AlertCircle size={16} color="#fb7185" />
+                        <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fb7185', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Core Problem &amp; Bottleneck
+                        </h4>
+                      </div>
+                      <p style={{ fontSize: '0.9rem', lineHeight: '1.7', color: '#cbd5e1' }}>
+                        {extraction.problem_statement}
                       </p>
                     </div>
 
                     <div
                       style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'rgba(16, 185, 129, 0.04)',
+                        border: '1px solid rgba(16, 185, 129, 0.25)',
                         borderRadius: '12px',
                         padding: '20px',
                       }}
                     >
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981', marginBottom: '8px' }}>
-                        Proposed Methodology
-                      </h4>
-                      <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#cbd5e1' }}>
-                        {extraction.methodology || 'Hardware-aligned decomposition, selective state expansion, and parameter-efficient scaling.'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <CheckCircle size={16} color="#10b981" />
+                        <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Proposed Methodology &amp; Architecture
+                        </h4>
+                      </div>
+                      <p style={{ fontSize: '0.9rem', lineHeight: '1.7', color: '#cbd5e1' }}>
+                        {extraction.methodology}
                       </p>
                     </div>
                   </div>
 
-                  {/* Key Results */}
+                  {/* Empirical Key Results */}
                   <div
                     style={{
                       background: 'rgba(255, 255, 255, 0.03)',
                       border: '1px solid rgba(255, 255, 255, 0.08)',
                       borderRadius: '12px',
-                      padding: '20px',
+                      padding: '22px 24px',
                     }}
                   >
-                    <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#38bdf8', marginBottom: '12px' }}>
-                      Key Empirical Results
-                    </h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                      <TrendingUp size={16} color="#38bdf8" />
+                      <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Key Quantitative Results &amp; Empirical Findings
+                      </h4>
+                    </div>
                     {Array.isArray(extraction.key_results) && extraction.key_results.length > 0 ? (
-                      <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {extraction.key_results.map((res, i) => (
-                          <li key={i} style={{ fontSize: '0.9rem', color: '#e2e8f0', lineHeight: '1.5' }}>
-                            {res}
-                          </li>
+                          <div
+                            key={i}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '12px',
+                              background: 'rgba(0, 0, 0, 0.2)',
+                              padding: '12px 16px',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.04)',
+                            }}
+                          >
+                            <span className="badge badge-cyan" style={{ fontSize: '0.65rem', marginTop: '2px' }}>
+                              #{i + 1}
+                            </span>
+                            <span style={{ fontSize: '0.9rem', color: '#e2e8f0', lineHeight: '1.6' }}>
+                              {res}
+                            </span>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     ) : (
                       <p style={{ fontSize: '0.9rem', color: '#94a3b8' }}>
-                        Empirical gains demonstrated across standard language modeling benchmarks, perplexity evaluation, and latency throughput SLAs.
+                        Empirical benchmark evaluations validated against standard baseline thresholds.
                       </p>
                     )}
                   </div>
 
-                  {/* Research Gaps Identified & AI Suggested Gaps */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  {/* Why It Matters & Target Audience */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '20px' }}>
                     <div
                       style={{
-                        background: 'rgba(245, 158, 11, 0.05)',
-                        border: '1px solid rgba(245, 158, 11, 0.2)',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '12px',
                         padding: '20px',
                       }}
                     >
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f59e0b', marginBottom: '8px' }}>
-                        Research Gaps (Authors)
+                      <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#f8fafc', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                        Strategic Importance &amp; Impact
                       </h4>
-                      <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: '#cbd5e1' }}>
-                        {Array.isArray(extraction.research_gaps_identified)
-                          ? extraction.research_gaps_identified.join(' · ')
-                          : 'Limited context window tests beyond current benchmark thresholds.'}
+                      <p style={{ fontSize: '0.9rem', lineHeight: '1.7', color: '#cbd5e1' }}>
+                        {extraction.why_it_matters}
                       </p>
                     </div>
 
                     <div
                       style={{
-                        background: 'rgba(168, 85, 247, 0.05)',
-                        border: '1px solid rgba(168, 85, 247, 0.2)',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '12px',
                         padding: '20px',
                       }}
                     >
-                      <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a855f7', marginBottom: '8px' }}>
-                        AI Critical Gaps & Counter-Theses
-                      </h4>
-                      <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: '#cbd5e1' }}>
-                        {Array.isArray(extraction.ai_suggested_gaps)
-                          ? extraction.ai_suggested_gaps.join(' · ')
-                          : 'Potential Unified Memory bandwidth bottlenecks and register spilling at extreme batch configurations.'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <Users size={16} color="#a855f7" />
+                        <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#a855f7', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Target Audience
+                        </h4>
+                      </div>
+                      <p style={{ fontSize: '0.9rem', lineHeight: '1.7', color: '#cbd5e1' }}>
+                        {extraction.audience}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Gaps: Authors vs AI Critical Counter-Theses */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div
+                      style={{
+                        background: 'rgba(245, 158, 11, 0.04)',
+                        border: '1px solid rgba(245, 158, 11, 0.25)',
+                        borderRadius: '12px',
+                        padding: '20px',
+                      }}
+                    >
+                      <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                        Admitted Gaps &amp; Assumptions (Authors)
+                      </h4>
+                      <ul style={{ paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {Array.isArray(extraction.research_gaps_identified) ? (
+                          extraction.research_gaps_identified.map((gap, idx) => (
+                            <li key={idx} style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.6' }}>
+                              {gap}
+                            </li>
+                          ))
+                        ) : (
+                          <li style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>{extraction.research_gaps_identified}</li>
+                        )}
+                      </ul>
+                    </div>
+
+                    <div
+                      style={{
+                        background: 'rgba(168, 85, 247, 0.04)',
+                        border: '1px solid rgba(168, 85, 247, 0.25)',
+                        borderRadius: '12px',
+                        padding: '20px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <ShieldAlert size={16} color="#c084fc" />
+                        <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          AI Critical Counter-Theses &amp; Hardware Risks
+                        </h4>
+                      </div>
+                      <ul style={{ paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {Array.isArray(extraction.ai_suggested_gaps) ? (
+                          extraction.ai_suggested_gaps.map((gap, idx) => (
+                            <li key={idx} style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: '1.6' }}>
+                              {gap}
+                            </li>
+                          ))
+                        ) : (
+                          <li style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>{extraction.ai_suggested_gaps}</li>
+                        )}
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -440,12 +539,12 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
 
               {/* TAB 2: SLICED ACADEMIC TEXT READER */}
               {activeTab === 'text' && (
-                <div style={{ maxWidth: '880px', margin: '0 auto', background: 'rgba(0, 0, 0, 0.25)', padding: '32px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div style={{ maxWidth: '900px', margin: '0 auto', background: 'rgba(0, 0, 0, 0.3)', padding: '32px 36px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
                   {slicedText ? (
                     <div
                       style={{
                         fontSize: `${fontSize}px`,
-                        lineHeight: '1.8',
+                        lineHeight: '1.85',
                         color: '#cbd5e1',
                         fontFamily: 'var(--font-sans)',
                         whiteSpace: 'pre-wrap',
@@ -464,7 +563,7 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
 
               {/* TAB 3: RAG CHUNKS INSPECTOR */}
               {activeTab === 'chunks' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '960px', margin: '0 auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '1000px', margin: '0 auto' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
                       Showing {filteredChunks.length} of {chunks.length} Token-Bounded Chunks (&le; 512 tokens)
@@ -497,7 +596,7 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
                           {chunk.token_count || 320} tokens
                         </span>
                       </div>
-                      <p style={{ fontSize: '0.85rem', lineHeight: '1.6', color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
+                      <p style={{ fontSize: '0.85rem', lineHeight: '1.65', color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
                         {chunk.text}
                       </p>
                     </div>
@@ -507,17 +606,51 @@ export default function PaperReaderModal({ paperId, onClose, onStageToTray, isSt
 
               {/* TAB 4: ORIGINAL PDF DOCUMENT EMBED */}
               {activeTab === 'pdf' && (
-                <div style={{ width: '100%', height: 'calc(90vh - 160px)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                  <iframe
-                    src={`${API_BASE}/library/papers/${paperId}/pdf#toolbar=1&navpanes=0`}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      border: 'none',
-                      background: '#1e293b',
-                    }}
-                    title={`PDF Viewer: ${title}`}
-                  />
+                <div style={{ width: '100%', height: 'calc(92vh - 160px)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      Streaming local sovereign PDF: <code>data/papers/{paperId}/paper.pdf</code>
+                    </span>
+                    <a
+                      href={pdfDirectUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-primary"
+                      style={{ fontSize: '0.75rem', padding: '6px 12px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <ExternalLink size={13} /> Open PDF in Dedicated Tab
+                    </a>
+                  </div>
+
+                  <div style={{ flex: 1, borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.1)', background: '#1e293b' }}>
+                    <object
+                      data={`${pdfDirectUrl}#toolbar=1`}
+                      type="application/pdf"
+                      width="100%"
+                      height="100%"
+                      style={{ display: 'block' }}
+                    >
+                      <iframe
+                        src={`${pdfDirectUrl}#toolbar=1`}
+                        width="100%"
+                        height="100%"
+                        style={{ border: 'none' }}
+                        title={`PDF Viewer: ${title}`}
+                      >
+                        <div style={{ padding: '40px', textAlign: 'center', color: '#cbd5e1' }}>
+                          <p style={{ marginBottom: '16px' }}>Your browser does not support embedded PDF objects.</p>
+                          <a
+                            href={pdfDirectUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-primary"
+                          >
+                            Open PDF Directly
+                          </a>
+                        </div>
+                      </iframe>
+                    </object>
+                  </div>
                 </div>
               )}
             </>

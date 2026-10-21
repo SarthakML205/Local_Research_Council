@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.api.stream import broadcaster
+from app.backend.extraction.batch_processor import batch_extractor
 from app.backend.graph.mindmap_synthesizer import mindmap_synthesizer
 from app.backend.ingest.arxiv_client import ArxivClient
 from app.backend.ingest.chunker import TextChunker
@@ -86,6 +87,18 @@ async def get_paper(paper_id: str) -> dict[str, Any]:
             sliced_text = sliced_text_file.read_text(encoding="utf-8")
         except Exception:
             pass
+
+    # Ensure rich extraction is generated if missing
+    if not extraction:
+        try:
+            ext_model = await batch_extractor.extract_paper(
+                paper_id,
+                (metadata or {}).get("summary", ""),
+                sliced_text,
+            )
+            extraction = ext_model.model_dump()
+        except Exception as exc:
+            logger.warning(f"Could not auto-extract dossier for {paper_id}: {exc}")
 
     return {
         "paper_id": paper_id,
@@ -236,6 +249,12 @@ async def start_research_session(req: ResearchSessionRequest) -> dict[str, Any]:
                 await qdrant_store.index_paper_chunks(p_id, chunks)
             except Exception as q_exc:
                 logger.warning(f"Qdrant indexing deferred for {p_id}: {q_exc}")
+
+            # Extract rich structured technical profile
+            try:
+                await batch_extractor.extract_paper(p_id, paper_meta.get("summary", ""), clean_text)
+            except Exception as ext_exc:
+                logger.warning(f"Extraction deferred for {p_id}: {ext_exc}")
         except Exception:
             chunks = []
 
