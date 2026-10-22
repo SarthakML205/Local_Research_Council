@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import NewSessionView from './components/NewSessionView';
 import DiscoveryView from './components/DiscoveryView';
+import ShelfView from './components/ShelfView';
 import CouncilView from './components/CouncilView';
 import LibraryView from './components/LibraryView';
 import DashboardView from './components/DashboardView';
@@ -291,70 +292,84 @@ export default function App() {
   const memoryMb = (hardware.rss_gb + hardware.metal_gb) * 1024.0;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', overflow: 'hidden' }}>
+      {/* Left Vertical Stark UI Sidebar */}
       <Navigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         health={health}
         memoryMb={memoryMb}
         errorCount={failures.length}
+        trayCount={trayPapers.length}
       />
 
-      <main style={{ flex: 1 }}>
-        {activeTab === 'session' && (
-          <NewSessionView
-            onStartSession={handleStartSession}
-            pipelineState={pipelineState}
-            onProceedToDiscovery={() => setActiveTab('discovery')}
-            apiBase={API_BASE}
-          />
-        )}
+      {/* Right Main Operating Chamber */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: '12px 16px 12px 12px' }}>
+        <main style={{ flex: 1, overflowY: 'auto' }}>
+          {activeTab === 'session' && (
+            <NewSessionView
+              onStartSession={handleStartSession}
+              pipelineState={pipelineState}
+              onProceedToDiscovery={() => setActiveTab('discovery')}
+              apiBase={API_BASE}
+            />
+          )}
 
-        {activeTab === 'discovery' && (
-          <DiscoveryView
-            graph={graph}
-            onStageToTray={handleStageToTray}
-            trayPapers={trayPapers}
-          />
-        )}
+          {activeTab === 'shelf' && (
+            <ShelfView
+              papers={papers}
+              trayPapers={trayPapers}
+              onStageToTray={handleStageToTray}
+              onConveneCouncil={() => setActiveTab('council')}
+            />
+          )}
 
-        {activeTab === 'council' && (
-          <CouncilView
-            trayPapers={trayPapers}
-            debateSession={debateSession}
-            onLaunchDebate={handleLaunchDebate}
-            onStepTurn={handleStepTurn}
-            onRunDebate={handleRunDebate}
-            turns={turns}
-            positionCards={positionCards}
-            isStepping={isStepping}
-            latestTurn={latestTurn}
-            papers={papers}
-          />
-        )}
+          {activeTab === 'discovery' && (
+            <DiscoveryView
+              graph={graph}
+              onStageToTray={handleStageToTray}
+              trayPapers={trayPapers}
+            />
+          )}
 
-        {activeTab === 'library' && (
-          <LibraryView
-            papers={papers}
-            trayPapers={trayPapers}
-            onStageToTray={handleStageToTray}
-            onRemoveFromTray={handleRemoveFromTray}
-            onFetchArxiv={handleFetchArxiv}
-            onScanInbox={handleScanInbox}
-            onConveneCouncil={() => setActiveTab('council')}
-          />
-        )}
+          {activeTab === 'council' && (
+            <CouncilView
+              trayPapers={trayPapers}
+              debateSession={debateSession}
+              onLaunchDebate={handleLaunchDebate}
+              onStepTurn={handleStepTurn}
+              onRunDebate={handleRunDebate}
+              turns={turns}
+              positionCards={positionCards}
+              isStepping={isStepping}
+              latestTurn={latestTurn}
+              papers={papers}
+            />
+          )}
 
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            telemetry={telemetry}
-            hardware={hardware}
-            failures={failures}
-            onRunAudit={handleRunAudit}
-            auditReport={auditReport}
-          />
-        )}
-      </main>
+          {activeTab === 'library' && (
+            <LibraryView
+              papers={papers}
+              trayPapers={trayPapers}
+              onStageToTray={handleStageToTray}
+              onRemoveFromTray={handleRemoveFromTray}
+              onFetchArxiv={handleFetchArxiv}
+              onScanInbox={handleScanInbox}
+              onConveneCouncil={() => setActiveTab('council')}
+            />
+          )}
+
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              telemetry={telemetry}
+              hardware={hardware}
+              failures={failures}
+              onRunAudit={handleRunAudit}
+              auditReport={auditReport}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 }

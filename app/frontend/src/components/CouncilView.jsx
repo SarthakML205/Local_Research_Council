@@ -403,8 +403,8 @@ export default function CouncilView({
               )}
             </div>
 
-            {/* Semicircle Advocate Podiums (Tony Stark AI Personas) */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(2, trayPapers.length)}, 1fr)`, gap: '10px' }}>
+            {/* Semicircle Advocate Podiums (Stark UI Holographic Cards) */}
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(2, trayPapers.length)}, 1fr)`, gap: '12px' }}>
               {trayPapers.map((pid, idx) => {
                 const persona = getAdvocatePersona(idx, pid);
                 const paper = getPaperDetails(pid);
@@ -414,47 +414,47 @@ export default function CouncilView({
                 return (
                   <div
                     key={pid}
+                    className="plate"
                     style={{
-                      background: isSpeaking ? persona.bg : isTarget ? 'rgba(244, 63, 94, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                      background: isSpeaking ? 'rgba(3, 4, 5, 0.9)' : 'rgba(3, 4, 5, 0.65)',
                       border: isSpeaking
-                        ? `1.5px solid ${persona.color}`
+                        ? '1.5px solid var(--red)'
                         : isTarget
-                        ? '1.5px dashed #f43f5e'
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '12px',
-                      padding: '10px 14px',
+                        ? '1.5px dashed var(--red)'
+                        : '1px solid var(--line)',
+                      borderRadius: '6px',
+                      padding: '14px 16px',
                       transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isSpeaking ? `0 0 25px ${persona.glow}` : 'none',
+                      boxShadow: isSpeaking ? '0 0 35px rgba(200, 16, 46, 0.45)' : 'none',
                       position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      minHeight: '140px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div
-                          className="star-avatar"
-                          style={{
-                            width: '26px',
-                            height: '26px',
-                            background: `rgba(${parseInt(persona.color.slice(1, 3), 16)}, ${parseInt(persona.color.slice(3, 5), 16)}, ${parseInt(persona.color.slice(5, 7), 16)}, 0.2)`,
-                            border: `1px solid ${persona.color}`,
-                            color: persona.color,
-                            fontSize: '0.9rem',
-                          }}
-                        >
-                          {persona.symbol}
-                        </div>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#f8fafc', letterSpacing: '0.03em' }}>
-                          {persona.name}
+                    {/* Top Row: Index & Stark AI Codename */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.1rem', fontFamily: 'var(--font-display)', color: isSpeaking ? 'var(--red)' : 'var(--hi)', fontWeight: 600 }}>
+                          0{idx + 1}
                         </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ color: persona.color, fontWeight: 900 }}>{persona.symbol}</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.04em' }}>
+                            {persona.name}
+                          </span>
+                        </div>
                       </div>
 
                       {isSpeaking ? (
                         <span
-                          className="badge"
+                          className="chip on"
                           style={{
                             fontSize: '0.65rem',
-                            background: persona.color,
-                            color: '#041226',
+                            padding: '2px 8px',
+                            color: 'var(--hi)',
+                            borderColor: 'var(--red)',
                             fontWeight: 800,
                           }}
                         >
@@ -462,43 +462,56 @@ export default function CouncilView({
                         </span>
                       ) : isTarget ? (
                         <span
-                          className="badge"
+                          className="chip"
                           style={{
                             fontSize: '0.65rem',
-                            background: 'rgba(244, 63, 94, 0.2)',
-                            color: '#fb7185',
-                            border: '1px solid #f43f5e',
+                            padding: '2px 8px',
+                            color: 'var(--red)',
+                            borderColor: 'var(--red)',
                             fontWeight: 800,
                           }}
                         >
                           CROSS-EXAMINED
                         </span>
                       ) : (
-                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontFamily: 'var(--font-mono)' }}>
-                          P{idx + 1}
+                        <span className="chip" style={{ fontSize: '0.62rem', padding: '2px 6px', color: 'var(--mute)' }}>
+                          DEFENDING
                         </span>
                       )}
                     </div>
 
-                    <p style={{ fontSize: '0.72rem', color: persona.color, fontWeight: 700, marginBottom: '4px' }}>
-                      {persona.title}
-                    </p>
+                    {/* Paper Title & Methodology */}
+                    <div style={{ marginBottom: '8px' }}>
+                      <p style={{
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        color: 'var(--hi)',
+                        lineHeight: '1.4',
+                        marginBottom: '4px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }} title={paper.title || pid}>
+                        {paper.title || pid}
+                      </p>
+                      <p style={{ fontSize: '0.72rem', color: persona.color, fontWeight: 600 }}>
+                        {persona.title}
+                      </p>
+                    </div>
 
-                    <p style={{
-                      fontSize: '0.75rem',
-                      color: '#cbd5e1',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }} title={paper.title || pid}>
-                      {paper.title || pid}
-                    </p>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px' }}>
-                      <ShieldCheck size={11} color="#10b981" />
-                      <span style={{ fontSize: '0.68rem', color: '#10b981', fontFamily: 'var(--font-mono)' }}>
-                        Qdrant Partition #{idx + 1} Isolated
-                      </span>
+                    {/* Bottom Metadata Strip */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderTop: '1px solid var(--line-faint)',
+                      paddingTop: '6px',
+                      fontSize: '0.65rem',
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--dim)',
+                    }}>
+                      <span>STACK <b style={{ color: 'var(--hi)', fontWeight: 400 }}>M5 · MLX</b></span>
+                      <span>PARTITION <b style={{ color: '#10b981', fontWeight: 600 }}>QDRANT P{idx + 1}</b></span>
                     </div>
                   </div>
                 );

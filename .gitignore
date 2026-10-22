@@ -37,7 +37,7 @@ htmlcov/
 data/
 *.lock
 
-# IDE & OS Artifacts
-.DS_Store
-.vscode/
-.idea/
+# Media recordings
+*.mov
+*.mp4
+
