@@ -22,6 +22,7 @@ from app.backend.ingest.extractor import PDFExtractor
 from app.backend.library.inbox_watcher import InboxWatcher
 from app.backend.library.library_store import LibraryStore
 from app.backend.library.paper_store import PaperStore
+from app.backend.retrieval.comparison_engine import compare_all_strategies
 from app.backend.retrieval.qdrant_store import qdrant_store
 
 logger: Final = logging.getLogger(__name__)
@@ -42,6 +43,19 @@ inbox_watcher: Final[InboxWatcher] = InboxWatcher(
 class ResearchSessionRequest(BaseModel):
     problem_statement: str = Field(..., description="Research question, problem statement, or technical doubt")
     max_papers: int = Field(default=3, ge=2, le=6)
+    strategy: str = Field(
+        default="strategy_c_hybrid_rerank",
+        description="Retrieval strategy: strategy_a_code_only | strategy_b_local_llm | strategy_c_hybrid_rerank",
+    )
+    selected_paper_ids: list[str] = Field(
+        default_factory=list,
+        description="Optional pre-selected paper IDs if chosen from comparison view",
+    )
+
+
+class StrategyComparisonRequest(BaseModel):
+    query: str = Field(..., description="Research query or technical problem statement")
+    max_papers: int = Field(default=4, ge=2, le=6)
 
 
 class ArxivFetchRequest(BaseModel):
@@ -186,22 +200,59 @@ async def fetch_arxiv_paper(req: ArxivFetchRequest) -> dict[str, Any]:
     }
 
 
+@router.post("/research/compare")
+async def compare_retrieval_strategies(req: StrategyComparisonRequest) -> dict[str, Any]:
+    """Execute 3-way retrieval strategy comparison concurrently (Code vs Local LLM vs Hybrid Rerank)."""
+    comparison = await compare_all_strategies(
+        query=req.query,
+        max_papers=req.max_papers,
+    )
+    return comparison.model_dump()
+
+
 @router.post("/research/session")
 async def start_research_session(req: ResearchSessionRequest) -> dict[str, Any]:
     """Screen 1: Accept problem statement, query arXiv, download, slice, index, and stage papers."""
     # 1. Pipeline stage: Querying arXiv index
     await broadcaster.publish("pipeline_progress", {
         "stage": "querying_arxiv",
-        "message": f"Querying arXiv Index for: '{req.problem_statement}'",
+        "message": f"Querying arXiv Index using {req.strategy}: '{req.problem_statement}'",
         "step": 1,
         "total_steps": 5,
     })
 
-    results = await arxiv_client.search(req.problem_statement, max_results=req.max_papers)
+    results: list[dict[str, Any]] = []
+
+    # If specific paper IDs were selected from comparison view, resolve them directly
+    if req.selected_paper_ids:
+        for pid in req.selected_paper_ids[:req.max_papers]:
+            p_res = await arxiv_client.search_by_id(pid)
+            if p_res:
+                results.append(p_res[0])
+    elif req.strategy != "strategy_c_hybrid_rerank":
+        # Run specific non-default strategy via comparison engine
+        comparison = await compare_all_strategies(req.problem_statement, max_papers=req.max_papers)
+        chosen_strat = comparison.strategies.get(req.strategy)
+        if chosen_strat and chosen_strat.papers:
+            for m in chosen_strat.papers:
+                results.append({
+                    "paper_id": m.paper_id,
+                    "arxiv_id": m.arxiv_id,
+                    "title": m.title,
+                    "summary": m.summary,
+                    "published": m.published,
+                    "authors": m.authors,
+                    "score": m.score,
+                    "pdf_url": f"https://export.arxiv.org/pdf/{m.arxiv_id}.pdf",
+                })
+
+    # Default to Strategy C (Flagship Hybrid Rerank)
     if not results:
-        # Fallback query with broader terms if exact doubt produced 0 hits
-        simplified_query = " ".join(req.problem_statement.split()[:4])
-        results = await arxiv_client.search(simplified_query, max_results=req.max_papers)
+        results = await arxiv_client.search(req.problem_statement, max_results=req.max_papers)
+        if not results:
+            # Fallback query with broader terms if exact doubt produced 0 hits
+            simplified_query = " ".join(req.problem_statement.split()[:4])
+            results = await arxiv_client.search(simplified_query, max_results=req.max_papers)
 
     if not results:
         raise HTTPException(

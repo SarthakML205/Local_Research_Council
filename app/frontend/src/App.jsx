@@ -161,13 +161,18 @@ export default function App() {
   };
 
   // Launch Problem Statement Research Session
-  const handleStartSession = async (problemStatement, maxPapers = 3) => {
-    setPipelineState({ step: 1, message: 'Querying arXiv Index...', completed: false });
+  const handleStartSession = async (problemStatement, maxPapers = 3, strategy = 'strategy_c_hybrid_rerank', selectedPaperIds = []) => {
+    setPipelineState({ step: 1, message: `Querying arXiv Index (${strategy})...`, completed: false });
     try {
       const res = await fetch(`${API_BASE}/library/research/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_statement: problemStatement, max_papers: maxPapers }),
+        body: JSON.stringify({
+          problem_statement: problemStatement,
+          max_papers: maxPapers,
+          strategy: strategy,
+          selected_paper_ids: selectedPaperIds,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -301,6 +306,7 @@ export default function App() {
             onStartSession={handleStartSession}
             pipelineState={pipelineState}
             onProceedToDiscovery={() => setActiveTab('discovery')}
+            apiBase={API_BASE}
           />
         )}
 

@@ -1,10 +1,41 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, Terminal, ArrowRight, Layers, CheckCircle2, Loader2, BookOpen, ShieldCheck } from 'lucide-react';
+import {
+  Search,
+  Sparkles,
+  Terminal,
+  ArrowRight,
+  Layers,
+  CheckCircle2,
+  Loader2,
+  BookOpen,
+  ShieldCheck,
+  Zap,
+  Brain,
+  Cpu,
+  Sliders,
+  Play,
+  Award,
+  Clock,
+  Coins,
+  Gauge,
+  HelpCircle,
+} from 'lucide-react';
 
-export default function NewSessionView({ onStartSession, pipelineState, onProceedToDiscovery }) {
+export default function NewSessionView({
+  onStartSession,
+  pipelineState,
+  onProceedToDiscovery,
+  apiBase = 'http://127.0.0.1:8000/api',
+}) {
   const [problemStatement, setProblemStatement] = useState('');
   const [maxPapers, setMaxPapers] = useState(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Strategy comparison state
+  const [compareMode, setCompareMode] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
+  const [comparisonData, setComparisonData] = useState(null);
+  const [compareError, setCompareError] = useState('');
 
   const sampleDoutes = [
     "How to reduce KV-cache memory pressure in long-context transformers on Apple Silicon?",
@@ -13,13 +44,44 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
     "Direct Preference Optimization (DPO) vs PPO stability in RLHF training",
   ];
 
-  const handleSubmit = async (query = problemStatement) => {
+  // Default execution: Uses Strategy C (Flagship Hybrid Rerank)
+  const handleSubmit = async (
+    query = problemStatement,
+    strategy = 'strategy_c_hybrid_rerank',
+    selectedPaperIds = []
+  ) => {
     if (!query.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await onStartSession(query.trim(), maxPapers);
+      await onStartSession(query.trim(), maxPapers, strategy, selectedPaperIds);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Run 3-Way Strategy Benchmark in Parallel
+  const handleRunComparison = async () => {
+    if (!problemStatement.trim() || isComparing) return;
+    setIsComparing(true);
+    setCompareError('');
+    try {
+      const res = await fetch(`${apiBase}/library/research/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: problemStatement.trim(),
+          max_papers: maxPapers,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Comparison API returned HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setComparisonData(data);
+    } catch (err) {
+      setCompareError(String(err));
+    } finally {
+      setIsComparing(false);
     }
   };
 
@@ -35,9 +97,9 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
   const isCompleted = pipelineState?.completed;
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '20px 16px 40px' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '20px 16px 40px' }}>
       {/* Hero Title */}
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
           <span className="badge badge-cyan" style={{ padding: '6px 14px', fontSize: '0.8rem' }}>
             <Sparkles size={14} /> Screen 1: Sovereign Research Session Launcher
@@ -46,13 +108,13 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
         <h2 style={{ fontSize: '2.2rem', fontWeight: 800, letterSpacing: '-0.03em', marginBottom: '10px' }}>
           What technical problem are we researching today?
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: '640px', margin: '0 auto' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: '680px', margin: '0 auto' }}>
           Enter a problem statement, technical doubt, or architectural hypothesis. LRC will scrape arXiv, download sovereign PDFs to disk, slice content, embed into Qdrant, and synthesize an interactive mind map.
         </p>
       </div>
 
       {/* Main Command Input Box */}
-      <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+      <div className="glass-panel" style={{ padding: '24px', marginBottom: '20px', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
           <div style={{ flex: 1, position: 'relative' }}>
             <textarea
@@ -78,13 +140,18 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSubmit();
+                  if (compareMode) {
+                    handleRunComparison();
+                  } else {
+                    handleSubmit();
+                  }
                 }
               }}
             />
           </div>
         </div>
 
+        {/* Action Controls & Strategy Comparison Switch */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           {/* Max Papers Selector (2 to 6 bounds) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -117,28 +184,90 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
             <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>papers</span>
           </div>
 
-          <button
-            className="btn-primary"
-            style={{ padding: '12px 24px', fontSize: '0.95rem' }}
-            onClick={() => handleSubmit()}
-            disabled={!problemStatement.trim() || isSubmitting || (currentStep > 0 && !isCompleted)}
-          >
-            {isSubmitting || (currentStep > 0 && !isCompleted) ? (
-              <>
-                <Loader2 size={18} className="animate-spin" /> Ingesting Sovereign Papers...
-              </>
+          {/* Toggle Strategy Comparison Mode */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !compareMode;
+                setCompareMode(next);
+                if (next && problemStatement.trim() && !comparisonData) {
+                  handleRunComparison();
+                }
+              }}
+              disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                borderRadius: '20px',
+                border: '1px solid',
+                borderColor: compareMode ? '#a855f7' : 'rgba(255, 255, 255, 0.15)',
+                background: compareMode ? 'rgba(168, 85, 247, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                color: compareMode ? '#c084fc' : 'var(--text-dim)',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              <Sliders size={14} color={compareMode ? '#c084fc' : 'var(--text-dim)'} />
+              <span>Compare Strategies (Code vs LLM vs Rerank)</span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: compareMode ? '#a855f7' : 'rgba(255, 255, 255, 0.2)',
+                  boxShadow: compareMode ? '0 0 8px #a855f7' : 'none',
+                }}
+              />
+            </button>
+
+            {compareMode ? (
+              <button
+                className="btn-secondary"
+                style={{ padding: '10px 18px', fontSize: '0.9rem', borderColor: '#a855f7', color: '#c084fc' }}
+                onClick={handleRunComparison}
+                disabled={!problemStatement.trim() || isComparing || isSubmitting}
+              >
+                {isComparing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Benchmarking 3 Pipelines...
+                  </>
+                ) : (
+                  <>
+                    <Play size={16} /> Run 3-Way Benchmark
+                  </>
+                )}
+              </button>
             ) : (
-              <>
-                <Search size={18} /> Ingest Top Papers & Convene Council
-              </>
+              <button
+                className="btn-primary"
+                style={{ padding: '12px 24px', fontSize: '0.95rem' }}
+                onClick={() => handleSubmit()}
+                disabled={!problemStatement.trim() || isSubmitting || (currentStep > 0 && !isCompleted)}
+              >
+                {isSubmitting || (currentStep > 0 && !isCompleted) ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" /> Ingesting Sovereign Papers...
+                  </>
+                ) : (
+                  <>
+                    <Search size={18} /> Ingest Top Papers & Convene Council
+                  </>
+                )}
+              </button>
             )}
-          </button>
+          </div>
         </div>
       </div>
 
       {/* Quick-Pick Problem Statements */}
       {(!currentStep || isCompleted) && (
-        <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '24px' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.05em' }}>
             Or select an empirical benchmark question:
           </span>
@@ -157,13 +286,115 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
                 }}
                 onClick={() => {
                   setProblemStatement(sample);
-                  handleSubmit(sample);
+                  if (compareMode) {
+                    setTimeout(() => handleRunComparison(), 50);
+                  } else {
+                    handleSubmit(sample);
+                  }
                 }}
               >
                 <Sparkles size={12} color="#38bdf8" /> {sample}
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* COMPARISON MODE VIEW: Side-by-Side 3-Way Architectural Showdown */}
+      {compareMode && (
+        <div style={{ marginBottom: '32px' }}>
+          {/* Header Banner */}
+          <div
+            style={{
+              padding: '16px 20px',
+              borderRadius: '10px',
+              background: 'linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.3)',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Gauge size={18} color="#a855f7" />
+                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#f8fafc' }}>
+                  The 3-Way Search & Reranking Strategy Matrix
+                </h4>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Compare latency, token costs, VRAM footprint, and retrieval precision across Code-Only Regex, Local LLaMA 8B, and Apple M5 Hybrid Reranking.
+              </p>
+            </div>
+
+            {comparisonData && (
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>
+                <span className="badge badge-cyan">
+                  Pool: {comparisonData.total_candidates_analyzed} preprints
+                </span>
+                <span className="badge badge-emerald">
+                  <Clock size={12} /> Parallel Wall Time: {comparisonData.parallel_execution_wall_time_ms}ms
+                </span>
+              </div>
+            )}
+          </div>
+
+          {compareError && (
+            <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#fca5a5', fontSize: '0.85rem', marginBottom: '16px' }}>
+              Comparison failed: {compareError}. Make sure the backend server is running.
+            </div>
+          )}
+
+          {isComparing && (
+            <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', border: '1px dashed rgba(168, 85, 247, 0.4)' }}>
+              <Loader2 size={32} className="animate-spin" color="#a855f7" style={{ margin: '0 auto 16px' }} />
+              <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '6px' }}>
+                Executing 3 Strategies Concurrently in Parallel...
+              </h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Querying arXiv API, evaluating exact regex heuristics, prompting local LLaMA-3.1-8B, and running MLX bge-reranker on Metal.
+              </p>
+            </div>
+          )}
+
+          {/* 3 Columns Display */}
+          {comparisonData && !isComparing && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+              {/* Strategy A: Code-Only Logic (The Literal Librarian) */}
+              {renderStrategyColumn(
+                comparisonData.strategies.strategy_a_code_only,
+                'rgba(148, 163, 184, 0.25)',
+                '#94a3b8',
+                <Zap size={16} color="#94a3b8" />,
+                handleSubmit,
+                problemStatement
+              )}
+
+              {/* Strategy B: Local LLM Call (The Heavy Thinker) */}
+              {renderStrategyColumn(
+                comparisonData.strategies.strategy_b_local_llm,
+                'rgba(245, 158, 11, 0.3)',
+                '#f59e0b',
+                <Brain size={16} color="#f59e0b" />,
+                handleSubmit,
+                problemStatement
+              )}
+
+              {/* Strategy C: Hybrid Reranking (The Smart Context Assistant) [FLAGSHIP] */}
+              {renderStrategyColumn(
+                comparisonData.strategies.strategy_c_hybrid_rerank,
+                'rgba(56, 189, 248, 0.5)',
+                '#38bdf8',
+                <Sparkles size={16} color="#38bdf8" />,
+                handleSubmit,
+                problemStatement,
+                true
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -190,7 +421,6 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
             {steps.map(step => {
               const isPast = currentStep > step.id || isCompleted;
               const isCurrent = currentStep === step.id && !isCompleted;
-              const isPending = currentStep < step.id && !isCompleted;
 
               return (
                 <div
@@ -262,6 +492,180 @@ export default function NewSessionView({ onStartSession, pipelineState, onProcee
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Render individual Strategy Column in 3-Way Comparison
+function renderStrategyColumn(
+  strat,
+  borderColor,
+  accentColor,
+  icon,
+  onConvene,
+  problemStatement,
+  isFlagship = false
+) {
+  if (!strat) return null;
+
+  const paperIds = (strat.papers || []).map(p => p.paper_id);
+
+  return (
+    <div
+      className="glass-panel"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '20px',
+        border: `1px solid ${borderColor}`,
+        background: isFlagship
+          ? 'radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), rgba(15, 23, 42, 0.95))'
+          : 'rgba(15, 23, 42, 0.75)',
+        boxShadow: isFlagship ? '0 8px 32px rgba(56, 189, 248, 0.15)' : 'none',
+        position: 'relative',
+        borderRadius: '12px',
+      }}
+    >
+      {/* Flagship Badge */}
+      {isFlagship && (
+        <div style={{ position: 'absolute', top: '-11px', right: '16px' }}>
+          <span className="badge badge-cyan" style={{ fontSize: '0.7rem', padding: '4px 10px', boxShadow: '0 0 10px rgba(56, 189, 248, 0.4)' }}>
+            <Award size={12} /> LRC Flagship Engine
+          </span>
+        </div>
+      )}
+
+      {/* Column Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+        {icon}
+        <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
+          {strat.strategy_name}
+        </h4>
+      </div>
+      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: accentColor, marginBottom: '10px' }}>
+        {strat.tagline}
+      </div>
+
+      {/* Narrative Block */}
+      <div
+        style={{
+          padding: '10px 12px',
+          borderRadius: '8px',
+          background: 'rgba(0, 0, 0, 0.35)',
+          borderLeft: `3px solid ${accentColor}`,
+          fontSize: '0.78rem',
+          color: 'var(--text-muted)',
+          fontStyle: 'italic',
+          lineHeight: '1.4',
+          marginBottom: '14px',
+        }}
+      >
+        "{strat.narrative}"
+      </div>
+
+      {/* Telemetry Metrics Pill Bar */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '8px',
+          padding: '10px',
+          borderRadius: '8px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          marginBottom: '16px',
+          textAlign: 'center',
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 600 }}>
+            Latency
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: strat.latency_ms < 50 ? '#10b981' : strat.latency_ms < 500 ? '#38bdf8' : '#f59e0b' }}>
+            {strat.latency_ms} ms
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 600 }}>
+            Context Cost
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: strat.token_cost === 0 ? '#10b981' : '#f59e0b' }}>
+            {strat.token_cost} tok
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 600 }}>
+            VRAM / RAM
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: strat.vram_mb === 0 ? '#10b981' : '#38bdf8' }}>
+            {strat.vram_mb > 0 ? `${(strat.vram_mb / 1024).toFixed(1)} GB` : '0 MB'}
+          </div>
+        </div>
+      </div>
+
+      {/* Retrieved Paper Cards List */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700, letterSpacing: '0.05em' }}>
+          Top Retrieved Preprints ({strat.papers.length}):
+        </div>
+
+        {strat.papers.map((p, idx) => (
+          <div
+            key={idx}
+            style={{
+              padding: '10px 12px',
+              borderRadius: '8px',
+              background: 'rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.05)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, fontFamily: 'var(--font-mono)', color: accentColor }}>
+                #{p.rank} • arXiv:{p.arxiv_id}
+              </span>
+              {p.score !== undefined && (
+                <span className="badge badge-cyan" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                  Score: {p.score}
+                </span>
+              )}
+            </div>
+
+            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f8fafc', lineHeight: '1.3' }}>
+              {p.title}
+            </div>
+
+            {/* Why it chose this paper */}
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px', lineHeight: '1.3' }}>
+              <span style={{ color: accentColor, fontWeight: 600 }}>Why: </span>
+              {p.match_reason}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Convene Action Button */}
+      <button
+        type="button"
+        className={isFlagship ? 'btn-primary' : 'btn-secondary'}
+        style={{
+          width: '100%',
+          padding: '10px 14px',
+          fontSize: '0.85rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          borderColor: isFlagship ? undefined : borderColor,
+        }}
+        onClick={() => onConvene(problemStatement, strat.strategy_id, paperIds)}
+      >
+        <span>Convene with {strat.tagline}</span>
+        <ArrowRight size={14} />
+      </button>
     </div>
   );
 }
