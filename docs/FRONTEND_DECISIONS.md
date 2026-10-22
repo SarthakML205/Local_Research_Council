@@ -103,3 +103,19 @@ Refactor `CouncilView.jsx` to permanently display the sovereign assembly:
 - **Chancellor Dais:** Top center podium for `J.A.R.V.I.S. [CHANCELLOR & CONSENSUS ARBITER]`.
 - **4-Advocate Array:** Responsive grid (`repeat(auto-fit, minmax(200px, 1fr))`) showing `F.R.I.D.A.Y.`, `E.D.I.T.H.`, `K.A.R.E.N.`, and `J.O.C.A.S.T.A.` with two-line title clamping and `DEFENDING` / `SPEAKING` badges.
 - **Dialectic Controls:** `RE-CONVENE`, `STEP TURN`, and `NEW DEBATE RUN` buttons that auto-stage if unlaunched and allow on-demand re-runs.
+
+---
+
+## ADR-F08: Stark UI 26 Mechanical Drag-and-Drop PDF Upload Console
+
+### Context
+Users researching proprietary or local research papers need a direct, friction-free way to upload PDF files right from the inquiry launcher (Screen 1) without requiring command-line copying or navigating to secondary folders.
+
+### Decision
+Implement a dual-mode query launcher in `app/frontend/src/components/NewSessionView.jsx`:
+- **Segmented Control:** `01 // arXiv Sovereign Query` vs `02 // Direct Local PDF Upload`.
+- **Mechanical Dropzone:** Styled in Stark UI 26 `.plate` aesthetics with obsidian dark backdrop (`rgba(8, 12, 18, 0.75)`), dashed border, and amber corner registration marks.
+- **Multi-File Staging:** Displays staged PDFs in a responsive grid showing filename, formatted file size (`KB` / `MB`), `.pdf` badge, and one-click removal (`X`).
+- **Unified Actions:** Supports "Upload to Library Only" (stages to 3D shelf) and "Ingest & Convene Council" (stages directly to active Council Tray and enables immediate debate execution).
+- **Multi-Destination Completion Buttons:** Once ingestion completes, provides instant navigation to "Enter Council Chamber", "Inspect in 3D Shelf", or "Explore Mind Map".
+

@@ -190,6 +190,45 @@ export default function App() {
     }
   };
 
+  const handleUploadPapers = async (fileList, problemStatement = '', autoStageTray = true) => {
+    setPipelineState({ step: 1, message: `Reading and validating ${fileList.length} local PDF file(s)...`, completed: false });
+    const formData = new FormData();
+    for (let i = 0; i < fileList.length; i++) {
+      formData.append('files', fileList[i]);
+    }
+    formData.append('problem_statement', problemStatement);
+    formData.append('auto_stage_tray', autoStageTray ? 'true' : 'false');
+
+    try {
+      const res = await fetch(`${API_BASE}/library/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrayPapers(data.council_tray || data.paper_ids || []);
+        if (data.graph) {
+          setGraph(data.graph);
+        }
+        setPipelineState({
+          step: 5,
+          message: `Successfully indexed ${data.papers?.length || fileList.length} PDF papers into sovereign library!`,
+          completed: true,
+          paper_ids: data.paper_ids,
+        });
+        await loadLibrary();
+        return data;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Upload returned HTTP ${res.status}`);
+      }
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setPipelineState({ step: 0, message: `Upload error: ${err.message}`, completed: false });
+      throw err;
+    }
+  };
+
   const handleStageToTray = async (paperId) => {
     if (trayPapers.includes(paperId)) return;
     const next = [...trayPapers, paperId];
@@ -335,8 +374,12 @@ export default function App() {
           {activeTab === 'session' && (
             <NewSessionView
               onStartSession={handleStartSession}
+              onUploadPapers={handleUploadPapers}
               pipelineState={pipelineState}
               onProceedToDiscovery={() => setActiveTab('discovery')}
+              onProceedToShelf={() => setActiveTab('shelf')}
+              onConveneCouncil={() => setActiveTab('council')}
+              trayPapers={trayPapers}
               apiBase={API_BASE}
             />
           )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Search,
   Sparkles,
@@ -19,17 +19,33 @@ import {
   Coins,
   Gauge,
   HelpCircle,
+  FileUp,
+  FileText,
+  Upload,
+  X,
+  Trash2,
 } from 'lucide-react';
 
 export default function NewSessionView({
   onStartSession,
+  onUploadPapers,
   pipelineState,
   onProceedToDiscovery,
+  onProceedToShelf,
+  onConveneCouncil,
+  trayPapers = [],
   apiBase = 'http://127.0.0.1:8000/api',
 }) {
   const [problemStatement, setProblemStatement] = useState('');
   const [maxPapers, setMaxPapers] = useState(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Direct PDF Upload State
+  const [inputMode, setInputMode] = useState('arxiv'); // 'arxiv' | 'upload'
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef(null);
 
   // Strategy comparison state
   const [compareMode, setCompareMode] = useState(false);
@@ -43,6 +59,44 @@ export default function NewSessionView({
     "Speculative decoding latency improvements using small draft models on unified memory",
     "Direct Preference Optimization (DPO) vs PPO stability in RLHF training",
   ];
+
+  const handleFilesAdded = (incomingFiles) => {
+    if (!incomingFiles || incomingFiles.length === 0) return;
+    const pdfs = Array.from(incomingFiles).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (pdfs.length === 0) {
+      setUploadError('Only .pdf files are accepted for sovereign local ingestion.');
+      return;
+    }
+    setUploadError('');
+    setUploadedFiles(prev => {
+      const existingNames = new Set(prev.map(f => f.name));
+      const newlyAdded = pdfs.filter(f => !existingNames.has(f.name));
+      return [...prev, ...newlyAdded].slice(0, 6);
+    });
+    setInputMode('upload');
+  };
+
+  const handleUploadSubmit = async (autoStage = true) => {
+    if (uploadedFiles.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    setUploadError('');
+    try {
+      if (onUploadPapers) {
+        await onUploadPapers(uploadedFiles, problemStatement.trim() || 'Direct Local PDF Research Council', autoStage);
+      }
+    } catch (err) {
+      setUploadError(String(err));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
 
   // Default execution: Uses Strategy C (Flagship Hybrid Rerank)
   const handleSubmit = async (
@@ -115,154 +169,466 @@ export default function NewSessionView({
 
       {/* Main Command Input Box */}
       <div className="glass-panel" style={{ padding: '24px', marginBottom: '20px', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <textarea
-              rows={3}
-              placeholder="e.g. How to reduce KV-cache memory pressure in long-context transformers on Apple Silicon without throughput regression?"
-              value={problemStatement}
-              onChange={e => setProblemStatement(e.target.value)}
-              disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
-              style={{
-                width: '100%',
-                background: 'rgba(0, 0, 0, 0.45)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '10px',
-                padding: '14px 16px',
-                color: '#fff',
-                fontSize: '0.95rem',
-                fontFamily: 'var(--font-sans)',
-                resize: 'none',
-                outline: 'none',
-                lineHeight: '1.5',
-                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  if (compareMode) {
-                    handleRunComparison();
-                  } else {
-                    handleSubmit();
-                  }
-                }
-              }}
-            />
-          </div>
+        {/* Input Mode Selector */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '12px' }}>
+          <button
+            type="button"
+            onClick={() => setInputMode('arxiv')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid',
+              borderColor: inputMode === 'arxiv' ? '#00f2fe' : 'transparent',
+              background: inputMode === 'arxiv' ? 'rgba(0, 242, 254, 0.12)' : 'transparent',
+              color: inputMode === 'arxiv' ? '#00f2fe' : 'var(--text-dim)',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Search size={14} /> 01 // arXiv Sovereign Query
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setInputMode('upload')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid',
+              borderColor: inputMode === 'upload' ? '#ffaa00' : 'transparent',
+              background: inputMode === 'upload' ? 'rgba(255, 153, 0, 0.12)' : 'transparent',
+              color: inputMode === 'upload' ? '#ffaa00' : 'var(--text-dim)',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-mono)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <FileUp size={14} /> 02 // Direct Local PDF Upload
+            {uploadedFiles.length > 0 && (
+              <span style={{ background: '#ffaa00', color: '#030405', borderRadius: '10px', padding: '1px 7px', fontSize: '0.7rem', fontWeight: 800 }}>
+                {uploadedFiles.length}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Action Controls & Strategy Comparison Switch */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-          {/* Max Papers Selector (2 to 6 bounds) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', fontWeight: 600 }}>
-              Council Scope:
-            </span>
-            {[2, 3, 4, 5, 6].map(num => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => setMaxPapers(num)}
-                disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '6px',
-                  border: '1px solid',
-                  borderColor: maxPapers === num ? '#38bdf8' : 'var(--border-color)',
-                  background: maxPapers === num ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-                  color: maxPapers === num ? '#38bdf8' : 'var(--text-muted)',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {num}
-              </button>
-            ))}
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>papers</span>
+        {uploadError && (
+          <div style={{ padding: '10px 14px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', color: '#fca5a5', fontSize: '0.82rem', marginBottom: '14px' }}>
+            {uploadError}
           </div>
+        )}
 
-          {/* Toggle Strategy Comparison Mode */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={() => {
-                const next = !compareMode;
-                setCompareMode(next);
-                if (next && problemStatement.trim() && !comparisonData) {
-                  handleRunComparison();
-                }
+        {inputMode === 'arxiv' ? (
+          <>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. How to reduce KV-cache memory pressure in long-context transformers on Apple Silicon without throughput regression?"
+                  value={problemStatement}
+                  onChange={e => setProblemStatement(e.target.value)}
+                  disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(0, 0, 0, 0.45)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                    color: '#fff',
+                    fontSize: '0.95rem',
+                    fontFamily: 'var(--font-sans)',
+                    resize: 'none',
+                    outline: 'none',
+                    lineHeight: '1.5',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (compareMode) {
+                        handleRunComparison();
+                      } else {
+                        handleSubmit();
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Quick drag & drop bar while in arXiv mode */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                handleFilesAdded(e.dataTransfer.files);
               }}
-              disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
+              onClick={() => {
+                setInputMode('upload');
+                if (fileInputRef.current) fileInputRef.current.click();
+              }}
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
+                border: isDragging ? '1px dashed #00f2fe' : '1px dashed rgba(255, 255, 255, 0.12)',
+                borderRadius: '8px',
                 padding: '8px 14px',
-                borderRadius: '20px',
-                border: '1px solid',
-                borderColor: compareMode ? '#a855f7' : 'rgba(255, 255, 255, 0.15)',
-                background: compareMode ? 'rgba(168, 85, 247, 0.18)' : 'rgba(255, 255, 255, 0.03)',
-                color: compareMode ? '#c084fc' : 'var(--text-dim)',
-                fontSize: '0.8rem',
-                fontWeight: 700,
+                marginBottom: '16px',
+                background: isDragging ? 'rgba(0, 242, 254, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                transition: 'all 0.2s ease',
               }}
             >
-              <Sliders size={14} color={compareMode ? '#c084fc' : 'var(--text-dim)'} />
-              <span>Compare Strategies (Code vs LLM vs Rerank)</span>
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '8px',
-                  height: '8px',
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: isDragging ? '#00f2fe' : 'var(--text-dim)' }}>
+                <FileUp size={15} color={isDragging ? '#00f2fe' : '#708090'} />
+                <span>Have local papers? <strong>Drop PDF files here</strong> or switch to Direct Upload</span>
+              </div>
+              <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', color: '#708090' }}>
+                BYPASS ARXIV // LOCAL-ONLY
+              </span>
+            </div>
+
+            {/* Action Controls & Strategy Comparison Switch */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+              {/* Max Papers Selector (2 to 6 bounds) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', fontWeight: 600 }}>
+                  Council Scope:
+                </span>
+                {[2, 3, 4, 5, 6].map(num => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setMaxPapers(num)}
+                    disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      borderColor: maxPapers === num ? '#38bdf8' : 'var(--border-color)',
+                      background: maxPapers === num ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                      color: maxPapers === num ? '#38bdf8' : 'var(--text-muted)',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {num}
+                  </button>
+                ))}
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>papers</span>
+              </div>
+
+              {/* Toggle Strategy Comparison Mode */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !compareMode;
+                    setCompareMode(next);
+                    if (next && problemStatement.trim() && !comparisonData) {
+                      handleRunComparison();
+                    }
+                  }}
+                  disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 14px',
+                    borderRadius: '20px',
+                    border: '1px solid',
+                    borderColor: compareMode ? '#a855f7' : 'rgba(255, 255, 255, 0.15)',
+                    background: compareMode ? 'rgba(168, 85, 247, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                    color: compareMode ? '#c084fc' : 'var(--text-dim)',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <Sliders size={14} color={compareMode ? '#c084fc' : 'var(--text-dim)'} />
+                  <span>Compare Strategies (Code vs LLM vs Rerank)</span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: compareMode ? '#a855f7' : 'rgba(255, 255, 255, 0.2)',
+                      boxShadow: compareMode ? '0 0 8px #a855f7' : 'none',
+                    }}
+                  />
+                </button>
+
+                {compareMode ? (
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: '10px 18px', fontSize: '0.9rem', borderColor: '#a855f7', color: '#c084fc' }}
+                    onClick={handleRunComparison}
+                    disabled={!problemStatement.trim() || isComparing || isSubmitting}
+                  >
+                    {isComparing ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" /> Benchmarking 3 Pipelines...
+                      </>
+                    ) : (
+                      <>
+                        <Play size={16} /> Run 3-Way Benchmark
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    className="btn-primary"
+                    style={{ padding: '12px 24px', fontSize: '0.95rem' }}
+                    onClick={() => handleSubmit()}
+                    disabled={!problemStatement.trim() || isSubmitting || (currentStep > 0 && !isCompleted)}
+                  >
+                    {isSubmitting || (currentStep > 0 && !isCompleted) ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" /> Ingesting Sovereign Papers...
+                      </>
+                    ) : (
+                      <>
+                        <Search size={18} /> Ingest Top Papers & Convene Council
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Direct PDF Upload Mode */
+          <div>
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={(e) => handleFilesAdded(e.target.files)}
+              accept=".pdf,application/pdf"
+              multiple
+              style={{ display: 'none' }}
+            />
+
+            {/* Stark UI 26 Mechanical Drag-and-Drop Dropzone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                handleFilesAdded(e.dataTransfer.files);
+              }}
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              style={{
+                position: 'relative',
+                border: isDragging ? '1px dashed #00f2fe' : '1px dashed rgba(255, 170, 0, 0.4)',
+                borderRadius: '8px',
+                padding: '28px 20px',
+                textAlign: 'center',
+                background: isDragging ? 'rgba(0, 242, 254, 0.08)' : 'rgba(8, 12, 18, 0.75)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                marginBottom: '16px',
+              }}
+            >
+              {/* Corner registration ticks */}
+              <div style={{ position: 'absolute', top: 4, left: 4, width: 8, height: 8, borderTop: '2px solid #ffaa00', borderLeft: '2px solid #ffaa00' }} />
+              <div style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderTop: '2px solid #ffaa00', borderRight: '2px solid #ffaa00' }} />
+              <div style={{ position: 'absolute', bottom: 4, left: 4, width: 8, height: 8, borderBottom: '2px solid #ffaa00', borderLeft: '2px solid #ffaa00' }} />
+              <div style={{ position: 'absolute', bottom: 4, right: 4, width: 8, height: 8, borderBottom: '2px solid #ffaa00', borderRight: '2px solid #ffaa00' }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '46px',
+                  height: '46px',
                   borderRadius: '50%',
-                  background: compareMode ? '#a855f7' : 'rgba(255, 255, 255, 0.2)',
-                  boxShadow: compareMode ? '0 0 8px #a855f7' : 'none',
+                  background: 'rgba(255, 170, 0, 0.12)',
+                  border: '1px solid rgba(255, 170, 0, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '2px',
+                }}>
+                  <FileUp size={22} color="#ffaa00" />
+                </div>
+                <div style={{ fontSize: '0.98rem', fontWeight: 700, color: '#f8fafc' }}>
+                  Drop PDF Research Papers Here or <span style={{ color: '#ffaa00', textDecoration: 'underline' }}>Browse Local Files</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', maxWidth: '560px', lineHeight: '1.4' }}>
+                  Direct PDF ingestion slices dense content with PyMuPDF, batches MLX Metal embeddings into Qdrant collections, and auto-stages to the Council Tray.
+                </div>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                  <span className="badge badge-amber" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>
+                    Multi-PDF Supported (2-6 papers)
+                  </span>
+                  <span className="badge badge-cyan" style={{ fontSize: '0.7rem', padding: '3px 8px' }}>
+                    Zero Cloud Egress
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Staged Files Cards */}
+            {uploadedFiles.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+                    Staged Papers ({uploadedFiles.length} of 6):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUploadedFiles([])}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: '0.72rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <Trash2 size={12} /> Clear Staged
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
+                  {uploadedFiles.map((file, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: 'rgba(15, 23, 42, 0.85)',
+                        border: '1px solid rgba(255, 170, 0, 0.3)',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <FileText size={16} color="#ffaa00" style={{ flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {file.name}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                            {formatFileSize(file.size)} • PDF
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUploadedFiles(prev => prev.filter((_, i) => i !== idx));
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-dim)',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Inquest Query / Topic Input for Uploaded Papers */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                Debate Query / Research Topic:
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Cross-examine architectural trade-offs, empirical speedups, and memory bottlenecks across these uploaded papers..."
+                value={problemStatement}
+                onChange={(e) => setProblemStatement(e.target.value)}
+                disabled={isSubmitting || (currentStep > 0 && !isCompleted)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(0, 0, 0, 0.45)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  color: '#fff',
+                  fontSize: '0.88rem',
+                  outline: 'none',
                 }}
               />
-            </button>
+            </div>
 
-            {compareMode ? (
+            {/* Action Buttons for Upload */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
               <button
+                type="button"
                 className="btn-secondary"
-                style={{ padding: '10px 18px', fontSize: '0.9rem', borderColor: '#a855f7', color: '#c084fc' }}
-                onClick={handleRunComparison}
-                disabled={!problemStatement.trim() || isComparing || isSubmitting}
+                onClick={() => handleUploadSubmit(false)}
+                disabled={uploadedFiles.length === 0 || isSubmitting || (currentStep > 0 && !isCompleted)}
+                style={{ fontSize: '0.85rem', padding: '10px 16px' }}
               >
-                {isComparing ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Benchmarking 3 Pipelines...
-                  </>
-                ) : (
-                  <>
-                    <Play size={16} /> Run 3-Way Benchmark
-                  </>
-                )}
+                <BookOpen size={14} /> Upload to Library Only
               </button>
-            ) : (
+
               <button
+                type="button"
                 className="btn-primary"
-                style={{ padding: '12px 24px', fontSize: '0.95rem' }}
-                onClick={() => handleSubmit()}
-                disabled={!problemStatement.trim() || isSubmitting || (currentStep > 0 && !isCompleted)}
+                onClick={() => handleUploadSubmit(true)}
+                disabled={uploadedFiles.length === 0 || isSubmitting || (currentStep > 0 && !isCompleted)}
+                style={{
+                  fontSize: '0.9rem',
+                  padding: '10px 20px',
+                  background: '#ffaa00',
+                  color: '#030405',
+                  fontWeight: 800,
+                  borderColor: '#ffaa00',
+                }}
               >
                 {isSubmitting || (currentStep > 0 && !isCompleted) ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" /> Ingesting Sovereign Papers...
+                    <Loader2 size={16} className="animate-spin" /> Ingesting & Slicing PDFs...
                   </>
                 ) : (
                   <>
-                    <Search size={18} /> Ingest Top Papers & Convene Council
+                    <FileUp size={16} /> Ingest & Convene Council ({uploadedFiles.length} Papers)
                   </>
                 )}
               </button>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Quick-Pick Problem Statements */}
@@ -481,13 +847,33 @@ export default function NewSessionView({
               <p style={{ fontSize: '0.9rem', color: '#10b981', marginBottom: '16px', fontWeight: 600 }}>
                 Successfully ingested and staged {pipelineState?.paper_ids?.length || maxPapers} papers into your Council Tray!
               </p>
-              <button
-                className="btn-primary"
-                style={{ padding: '12px 28px', fontSize: '1rem' }}
-                onClick={onProceedToDiscovery}
-              >
-                Explore Mind Map & Open Council Chamber <ArrowRight size={18} />
-              </button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {onConveneCouncil && (
+                  <button
+                    className="btn-primary"
+                    style={{ padding: '12px 24px', fontSize: '0.95rem', background: '#00f2fe', color: '#030405', fontWeight: 800 }}
+                    onClick={onConveneCouncil}
+                  >
+                    Enter Council Chamber <ArrowRight size={16} />
+                  </button>
+                )}
+                {onProceedToShelf && (
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: '12px 20px', fontSize: '0.95rem' }}
+                    onClick={onProceedToShelf}
+                  >
+                    Inspect in 3D Shelf
+                  </button>
+                )}
+                <button
+                  className="btn-secondary"
+                  style={{ padding: '12px 20px', fontSize: '0.95rem' }}
+                  onClick={onProceedToDiscovery}
+                >
+                  Explore Mind Map
+                </button>
+              </div>
             </div>
           )}
         </div>

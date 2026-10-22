@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class PaperExtractionSchema(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
 
+    schema_version: int = Field(default=1, description="Schema version")
     tldr: str = Field(description="Single-sentence, high-impact technical summary")
     problem_statement: str = Field(description="Core bottleneck or theoretical limitation addressed")
     methodology: str = Field(description="Underlying architecture, math formulation, or algorithmic contribution")

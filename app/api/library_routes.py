@@ -6,10 +6,13 @@ inbox imports, user collections, and council tray staging.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+from pathlib import Path
 from typing import Any, Final
 
-from fastapi import APIRouter, HTTPException, status
+import fitz  # type: ignore[import-untyped]
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -351,6 +354,187 @@ async def start_research_session(req: ResearchSessionRequest) -> dict[str, Any]:
         "paper_ids": staged_paper_ids,
         "papers": staged_papers_info,
         "graph": graph.model_dump(),
+    }
+
+
+@router.post("/upload")
+async def upload_pdf_papers(
+    files: list[UploadFile] = File(...),
+    problem_statement: str = Form(default=""),
+    auto_stage_tray: bool = Form(default=True),
+) -> dict[str, Any]:
+    """Upload one or more PDF research papers directly into local sovereign library.
+
+    Extracts high-density pages, chunks text, computes MLX embeddings, indexes into Qdrant,
+    generates mind map relationships, and optionally stages into Council Tray.
+    """
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No PDF files provided for upload.",
+        )
+
+    uploaded_ids: list[str] = []
+    uploaded_papers_info: list[dict[str, Any]] = []
+    total_files = len(files)
+
+    for idx, file in enumerate(files):
+        if not file.filename or not file.filename.lower().endswith(".pdf"):
+            continue
+
+        raw_bytes = await file.read()
+        if not raw_bytes:
+            continue
+
+        content_hash = hashlib.sha256(raw_bytes).hexdigest()
+        paper_id = f"local-{content_hash[:12]}"
+        uploaded_ids.append(paper_id)
+
+        clean_stem = Path(file.filename).stem.replace("_", " ").replace("-", " ").title()
+        title = clean_stem
+        authors = ["Local Researcher"]
+        abstract = ""
+
+        try:
+            doc = fitz.open(stream=raw_bytes, filetype="pdf")
+            if len(doc) > 0:
+                first_page = doc[0].get_text("text")
+                lines = [line.strip() for line in first_page.split("\n") if line.strip()]
+                if lines:
+                    title = lines[0][:150]
+                if len(lines) > 1 and len(lines[1]) < 100 and not lines[1].lower().startswith("abstract"):
+                    authors = [a.strip() for a in lines[1].split(",") if a.strip()][:4]
+                if "Abstract" in first_page:
+                    parts = first_page.split("Abstract", 1)
+                    abstract = parts[1][:1000].strip()
+            doc.close()
+        except Exception as exc:
+            logger.warning(f"Could not parse PDF metadata via PyMuPDF for {file.filename}: {exc}")
+
+        # Broadcast progress: Storing to disk
+        await broadcaster.publish("pipeline_progress", {
+            "stage": "streaming_pdf",
+            "message": f"[{idx+1}/{total_files}] Ingesting Local PDF to Disk: {title[:50]}...",
+            "step": 2,
+            "total_steps": 5,
+            "paper_id": paper_id,
+        })
+
+        metadata: dict[str, Any] = {
+            "paper_id": paper_id,
+            "arxiv_id": f"local/{file.filename}",
+            "title": title,
+            "summary": abstract or f"Locally uploaded research document '{file.filename}'.",
+            "published": "2026",
+            "authors": authors,
+            "categories": ["local.upload"],
+            "pdf_url": "",
+        }
+
+        # Initialize sovereign paper folder atomically
+        await paper_store.init_paper_folder(paper_id, raw_bytes, metadata)
+
+        # Slicing high-density pages
+        await broadcaster.publish("pipeline_progress", {
+            "stage": "slicing_pages",
+            "message": f"[{idx+1}/{total_files}] Slicing Dense Technical Content: {paper_id}",
+            "step": 3,
+            "total_steps": 5,
+            "paper_id": paper_id,
+        })
+
+        chunks: list[dict[str, Any]] = []
+        try:
+            clean_text = await pdf_extractor.slice_paper(paper_id)
+            await paper_store.save_sliced_text(paper_id, clean_text)
+            chunks = text_chunker.chunk_text(paper_id, clean_text)
+            await paper_store.save_chunks(paper_id, chunks)
+
+            # Embed & Index into Qdrant
+            try:
+                await qdrant_store.index_paper_chunks(paper_id, chunks)
+                await paper_store.mark_stage_completed(paper_id, "indexed")
+            except Exception as q_exc:
+                logger.warning(f"Qdrant indexing deferred for {paper_id}: {q_exc}")
+
+            # Extract structured technical profile
+            try:
+                await batch_extractor.extract_paper(paper_id, abstract, clean_text)
+            except Exception as ext_exc:
+                logger.warning(f"Extraction deferred for {paper_id}: {ext_exc}")
+        except Exception as exc:
+            logger.error(f"Failed processing PDF pipeline for {paper_id}: {exc}")
+
+        # Register in Library Store
+        await library_store.upsert_paper({
+            "paper_id": paper_id,
+            "title": title,
+            "authors": authors,
+            "year": "2026",
+            "arxiv_id": f"upload/{file.filename}",
+            "chunk_count": len(chunks),
+            "content_hash": content_hash,
+            "source": "local_import",
+        })
+
+        uploaded_papers_info.append({
+            "paper_id": paper_id,
+            "title": title,
+            "authors": authors,
+            "chunk_count": len(chunks),
+            "filename": file.filename,
+        })
+
+    if not uploaded_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid PDF documents could be processed.",
+        )
+
+    # Optional auto-staging into Council Tray
+    if auto_stage_tray:
+        tray = await library_store.get_council_tray()
+        existing = tray.get("paper_ids", [])
+        if len(uploaded_ids) >= 2:
+            staged = uploaded_ids[:6]
+        else:
+            staged = list(dict.fromkeys(uploaded_ids + existing))[:6]
+            if len(staged) < 2:
+                all_p = await library_store.get_papers()
+                for p in all_p:
+                    p_id = p.get("paper_id")
+                    if p_id and p_id not in staged:
+                        staged.append(p_id)
+                        if len(staged) >= 2:
+                            break
+        if len(staged) >= 2:
+            await library_store.update_council_tray(staged, prompt=problem_statement or "Uploaded PDF Debate")
+
+    # Synthesize Knowledge Graph
+    await broadcaster.publish("pipeline_progress", {
+        "stage": "synthesizing_mindmap",
+        "message": f"Synthesizing Knowledge Graph across {len(uploaded_ids)} uploaded papers...",
+        "step": 5,
+        "total_steps": 5,
+    })
+
+    graph = await mindmap_synthesizer.build_graph(uploaded_ids)
+
+    await broadcaster.publish("pipeline_completed", {
+        "problem_statement": problem_statement or "Local PDF Upload",
+        "paper_ids": uploaded_ids,
+        "status": "ready",
+    })
+
+    tray_data = await library_store.get_council_tray()
+
+    return {
+        "status": "completed",
+        "problem_statement": problem_statement,
+        "paper_ids": uploaded_ids,
+        "papers": uploaded_papers_info,
+        "graph": graph.model_dump(),
+        "council_tray": tray_data.get("paper_ids", []),
     }
 
 

@@ -30,13 +30,18 @@ The **Local Research Council (LRC)** is an offline academic research copilot and
 - **Candidate Pool Expansion:** Fetches up to 30 candidate preprints from arXiv.
 - **MLX Apple Silicon Reranking:** Re-scores candidates using local dense embeddings and cross-encoders to extract the top $K$ relevant papers within memory limits.
 
-### B. 3-Way Search & Reranking Strategy Engine
+### B. Direct Local Multi-PDF Paper Ingestion
+- **Zero-Cloud Local Ingestion:** Drag-and-drop or select 1 to 6 local research paper PDFs directly in the Inquiry Launcher (Screen 1) to bypass arXiv queries.
+- **Atomic Multi-Stage Pipeline:** Automatically computes SHA256 hashes, creates deterministic `local-<hash12>` sovereign directories, slices dense content via PyMuPDF, chunks into 256–512 token windows, and batches MLX dense vector embeddings directly into Qdrant collections.
+- **Instant Council Staging:** Auto-populates the Council Tray and synthesizes relational mind maps so researchers can launch dialectical debates with their own documents immediately.
+
+### C. 3-Way Search & Reranking Strategy Engine
 Provides side-by-side benchmarking of paper retrieval strategies:
 - **Strategy A (Code-Only Logic):** Pure regex keyword matching against titles and abstracts (~2 ms, 0 MB VRAM).
 - **Strategy B (Local LLM Zero-Shot):** Llama-3.1-8B parses and ranks candidate JSONs (~1.5–3.0 s).
 - **Strategy C (Flagship Hybrid Rerank):** Two-tier MLX dense vector embedding + BM25 sparse fusion via Reciprocal Rank Fusion (RRF) and cross-encoder reranking (~180 ms).
 
-### C. Dynamic Academic Debate Council (Stark AI Personas)
+### D. Dynamic Academic Debate Council (Stark AI Personas)
 Pits 2 to 6 research papers against each other in structured dialectical debate:
 - **J.A.R.V.I.S. (Chancellor & Consensus Arbiter):** Steers debate trajectory, challenges methodology boundaries, and synthesizes the final Pareto trade-off curriculum.
 - **Virtual Stark Advocates:**
@@ -48,7 +53,7 @@ Pits 2 to 6 research papers against each other in structured dialectical debate:
   - `T.A.D.A.S.H.I.` (Low-Latency Kernel Advocate)
 - **Turn Dynamics:** Opening theses -> reactive rebuttal chains addressing opponents directly -> J.A.R.V.I.S. mid-debate interventions -> grand consensus synthesis.
 
-### D. Stark UI 26 Minimalist Sci-Fi Operator Console
+### E. Stark UI 26 Minimalist Sci-Fi Operator Console
 Inspired by high-density command portals and the Augma Imaginarium specification:
 - **Color Tokens:** Void-black background (`#000000` / `#030405`), glowing Stark red accents (`#c8102e`), hairline borders (`rgba(200, 214, 226, 0.22)`), and Google Fonts (`Rajdhani` and `Share Tech Mono`).
 - **Vertical Command Sidebar:** 260px wide command array with 6 options:

@@ -214,16 +214,17 @@ class LibraryStore:
         return await self.list_papers()
 
     async def upsert_paper(self, record: dict[str, Any]) -> None:
+        p_folder = paper_store.get_paper_folder(record["paper_id"])
         paper_rec = LibraryPaperRecord(
             paper_id=record["paper_id"],
             arxiv_id=record.get("arxiv_id", ""),
             title=record.get("title", ""),
             authors="; ".join(record.get("authors", [])) if isinstance(record.get("authors"), list) else str(record.get("authors", "")),
             published=str(record.get("year", "")),
-            categories="",
-            folder_path=str(self.base_dir / record["paper_id"]),
-            pdf_path=str(self.base_dir / record["paper_id"] / "paper.pdf"),
-            source="arxiv",
+            categories=record.get("categories", ""),
+            folder_path=str(p_folder),
+            pdf_path=str(p_folder / "paper.pdf"),
+            source=record.get("source", "arxiv"),
             content_hash=record.get("content_hash", ""),
             chunk_count=int(record.get("chunk_count", 0)),
         )
