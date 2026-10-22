@@ -89,6 +89,8 @@ async def launch_debate(req: DebateLaunchRequest) -> dict[str, Any]:
         "debate_id": debate_id,
         "paper_ids": target_papers,
         "advocate_count": len(session.advocates),
+        "advocates": [a.model_dump() for a in session.advocates],
+        "moderator": session.moderator.model_dump(),
         "council_manifest": council_manifest,
     }
 
@@ -112,18 +114,7 @@ async def step_debate(debate_id: str) -> dict[str, Any]:
             "turn": None,
         }
 
-    turn_data = {
-        "turn_index": turn.turn_index,
-        "round_index": turn.round_index,
-        "agent_id": turn.agent_id,
-        "paper_id": turn.paper_id,
-        "target_paper_id": turn.target_paper_id,
-        "text": turn.text,
-        "citations_used": turn.citations_used,
-        "prompt_tokens": turn.prompt_tokens,
-        "total_tokens": turn.total_tokens,
-        "latency_ms": turn.latency_ms,
-    }
+    turn_data = turn.model_dump()
 
     # Broadcast turn event to SSE subscribers
     await broadcaster.publish("debate_turn", {"debate_id": debate_id, "turn": turn_data})
@@ -156,18 +147,7 @@ async def run_debate(debate_id: str) -> dict[str, Any]:
         if not turn:
             break
 
-        turn_dict = {
-            "turn_index": turn.turn_index,
-            "round_index": turn.round_index,
-            "agent_id": turn.agent_id,
-            "paper_id": turn.paper_id,
-            "target_paper_id": turn.target_paper_id,
-            "text": turn.text,
-            "citations_used": turn.citations_used,
-            "prompt_tokens": turn.prompt_tokens,
-            "total_tokens": turn.total_tokens,
-            "latency_ms": turn.latency_ms,
-        }
+        turn_dict = turn.model_dump()
         turns_executed.append(turn_dict)
         await broadcaster.publish("debate_turn", {"debate_id": debate_id, "turn": turn_dict})
         await asyncio.sleep(0.01)

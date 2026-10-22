@@ -1,4 +1,8 @@
-"""Dynamic agent spawning: generates virtual advocate personas and moderator."""
+"""Dynamic agent spawning: generates virtual advocate personas and moderator.
+
+Humanized Stark AI Personas (J.A.R.V.I.S., F.R.I.D.A.Y., E.D.I.T.H., etc.)
+with star constellation symbols and rigorous academic debate constraints.
+"""
 
 import logging
 
@@ -12,16 +16,65 @@ from app.backend.telemetry.events import BaseTelemetryRecord
 
 logger = logging.getLogger("app.backend.agents.agent_factory")
 
-COLOR_PALETTE = [
-    "#38bdf8",  # Sky Blue
-    "#f43f5e",  # Rose Red
-    "#10b981",  # Emerald Green
-    "#a855f7",  # Violet Purple
-    "#f59e0b",  # Amber Yellow
-    "#06b6d4",  # Cyan
-    "#ec4899",  # Pink
-    "#84cc16",  # Lime
+STARK_ADVOCATE_PERSONAS: list[dict[str, str]] = [
+    {
+        "stark_name": "F.R.I.D.A.Y.",
+        "codename": "Friday",
+        "title": "Lead Architecture Advocate",
+        "avatar_symbol": "✦",
+        "color": "#38bdf8",
+        "glow": "rgba(56, 189, 248, 0.4)",
+    },
+    {
+        "stark_name": "E.D.I.T.H.",
+        "codename": "Edith",
+        "title": "Empirical Benchmark Advocate",
+        "avatar_symbol": "★",
+        "color": "#10b981",
+        "glow": "rgba(16, 185, 129, 0.4)",
+    },
+    {
+        "stark_name": "K.A.R.E.N.",
+        "codename": "Karen",
+        "title": "Theoretical Systems Advocate",
+        "avatar_symbol": "✧",
+        "color": "#a855f7",
+        "glow": "rgba(168, 85, 247, 0.4)",
+    },
+    {
+        "stark_name": "J.O.C.A.S.T.A.",
+        "codename": "Jocasta",
+        "title": "Algorithmic Precision Advocate",
+        "avatar_symbol": "✪",
+        "color": "#f59e0b",
+        "glow": "rgba(245, 158, 11, 0.4)",
+    },
+    {
+        "stark_name": "V.E.R.O.N.I.C.A.",
+        "codename": "Veronica",
+        "title": "Hardware Saturation Advocate",
+        "avatar_symbol": "✷",
+        "color": "#f43f5e",
+        "glow": "rgba(244, 63, 94, 0.4)",
+    },
+    {
+        "stark_name": "T.A.D.A.S.H.I.",
+        "codename": "Tadashi",
+        "title": "Low-Latency Kernel Advocate",
+        "avatar_symbol": "✹",
+        "color": "#06b6d4",
+        "glow": "rgba(6, 182, 212, 0.4)",
+    },
 ]
+
+MODERATOR_STARK_PERSONA: dict[str, str] = {
+    "stark_name": "J.A.R.V.I.S.",
+    "codename": "Jarvis",
+    "title": "Council Moderator & Grand Synthesizer",
+    "avatar_symbol": "❂",
+    "color": "#fbbf24",
+    "glow": "rgba(251, 191, 36, 0.45)",
+}
 
 
 class CouncilAgent(BaseModel):
@@ -31,13 +84,19 @@ class CouncilAgent(BaseModel):
     paper_id: str
     role: str  # advocate | moderator
     display_name: str
-    color: str
+    stark_name: str = "F.R.I.D.A.Y."
+    stark_title: str = "Lead Defense Advocate"
+    avatar_symbol: str = "✦"
+    color: str = "#38bdf8"
+    glow: str = "rgba(56, 189, 248, 0.4)"
     system_persona: str
     persona_tokens: int
+    paper_title: str = ""
+    assigned_slot: int = 0
 
 
 class AgentFactory:
-    """Spawns virtual advocate agents from extracted paper schemas without loading extra LLM instances."""
+    """Spawns virtual advocate agents from extracted paper schemas with Stark AI personas."""
 
     def __init__(self) -> None:
         pass
@@ -48,7 +107,7 @@ class AgentFactory:
         slot_index: int,
         extraction: PaperExtractionSchema | None = None,
     ) -> CouncilAgent:
-        """Create a dedicated virtual advocate for a selected research paper."""
+        """Create a dedicated virtual advocate with a distinct Tony Stark AI persona."""
         agent_id = f"advocate:{paper_id}"
 
         # Bind retrieval partition handle
@@ -56,24 +115,38 @@ class AgentFactory:
 
         meta = await paper_store.read_metadata(paper_id) or {}
         title = meta.get("title", paper_id)
-        short_name = f"Paper #{slot_index + 1} ({paper_id[:8]})"
-        color = COLOR_PALETTE[slot_index % len(COLOR_PALETTE)]
 
-        if extraction:
-            persona = (
-                f"You are the Lead Author and Principal Advocate for {short_name}.\n"
-                f"Paper Title: {title}\n"
-                f"Core Methodology: {extraction.methodology[:200]}\n"
-                f"Key Empirical Results: {', '.join(extraction.key_results[:2])}\n"
-                f"Admitted Gaps: {', '.join(extraction.research_gaps_identified[:1])}\n"
-                f"Rules: Defend your architecture with rigor using strictly cited evidence [P{slot_index + 1} §Section #Chunk]. "
-                f"Critique opponents' scaling and methodological assumptions constructively."
-            )
-        else:
-            persona = (
-                f"You are the Lead Author and Advocate for {short_name}: '{title}'.\n"
-                f"Defend your methodology with citations and analyze trade-offs in competing approaches."
-            )
+        persona_template = STARK_ADVOCATE_PERSONAS[slot_index % len(STARK_ADVOCATE_PERSONAS)]
+        stark_name = persona_template["stark_name"]
+        avatar_symbol = persona_template["avatar_symbol"]
+        color = persona_template["color"]
+        glow = persona_template["glow"]
+        stark_title = f"{persona_template['title']} for {title[:40]}"
+
+        # Academic persona prompt enforcing humanized reactive debate
+        methodology = extraction.methodology[:200] if extraction else "Empirical architectural proofs"
+        problem = extraction.problem_statement[:150] if extraction else "Foundational scaling bounds"
+        gaps = (
+            ", ".join(extraction.research_gaps_identified[:2])
+            if extraction and extraction.research_gaps_identified
+            else "Hardware-specific cache paging"
+        )
+
+        persona = (
+            f"You are {stark_name}, defending the research paper: '{title}'.\n"
+            f"Core Problem: {problem}\n"
+            f"Your Methodology: {methodology}\n"
+            f"Known Limitations: {gaps}\n\n"
+            "CRITICAL DEBATE RULES:\n"
+            "1. WRITING STYLE: Write in professional, formal academic prose (paragraphs). "
+            "NEVER use raw unformatted bullet points or conversational AI filler ('Sure, I can help with that!').\n"
+            "2. REACTIVE DEBATE: You are speaking to peer researchers who hold opposing views. Maintain a formal, "
+            "academic, yet combative tone. When responding, you must directly address the previous speaker's claims:\n"
+            "   - 'While [Opponent] contends that..., their methodology fails to account for...'\n"
+            "   - 'Our empirical findings directly challenge [Opponent]'s baseline because...'\n"
+            f"3. GROUNDING: Back your arguments strictly using isolated evidence tags [P{slot_index + 1} §Section #Chunk]. "
+            "Expose logical or architectural flaws in opposing papers."
+        )
 
         tokens = max(1, len(persona.split()))
 
@@ -81,10 +154,16 @@ class AgentFactory:
             agent_id=agent_id,
             paper_id=paper_id,
             role="advocate",
-            display_name=short_name,
+            display_name=f"{stark_name} • {title[:32]}...",
+            stark_name=stark_name,
+            stark_title=stark_title,
+            avatar_symbol=avatar_symbol,
             color=color,
+            glow=glow,
             system_persona=persona,
             persona_tokens=tokens,
+            paper_title=title,
+            assigned_slot=slot_index + 1,
         )
 
         telemetry_collector.emit_nowait(
@@ -96,14 +175,14 @@ class AgentFactory:
         return agent
 
     def create_moderator(self, debate_prompt: str = "") -> CouncilAgent:
-        """Create the debate moderator / guiding agent."""
+        """Create the debate moderator J.A.R.V.I.S."""
         persona = (
-            "You are the Council Moderator and Principal Research Director.\n"
+            "You are J.A.R.V.I.S., Council Moderator and Grand Research Synthesizer.\n"
             "Your duties:\n"
-            "1. Steer the debate trajectory constructively; intervene if agents hallucinate or loop.\n"
-            "2. Challenge advocates on edge cases, hardware bounds, and theoretical scaling limits.\n"
-            "3. Synthesize an objective final comparative trade-off matrix and hybrid research roadmap.\n"
-            f"User Research Query: {debate_prompt or 'Compare architectural trade-offs and scaling bounds.'}"
+            "1. Steer the council trajectory constructively; intervene if advocates talk past each other or loop.\n"
+            "2. Challenge advocates on hardware saturation limits, empirical validity, and unified memory bounds.\n"
+            "3. Synthesize an objective final comparative trade-off matrix exposing the architectural Pareto frontier.\n"
+            f"Research Inquiry: {debate_prompt or 'Compare architectural trade-offs and scaling bounds.'}"
         )
         tokens = max(1, len(persona.split()))
 
@@ -111,10 +190,16 @@ class AgentFactory:
             agent_id="moderator",
             paper_id="",
             role="moderator",
-            display_name="Council Moderator",
-            color="#e2e8f0",
+            display_name="J.A.R.V.I.S. • Council Moderator",
+            stark_name=MODERATOR_STARK_PERSONA["stark_name"],
+            stark_title=MODERATOR_STARK_PERSONA["title"],
+            avatar_symbol=MODERATOR_STARK_PERSONA["avatar_symbol"],
+            color=MODERATOR_STARK_PERSONA["color"],
+            glow=MODERATOR_STARK_PERSONA["glow"],
             system_persona=persona,
             persona_tokens=tokens,
+            paper_title="Council Steering Dais",
+            assigned_slot=0,
         )
 
 

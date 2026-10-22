@@ -329,6 +329,7 @@ export default function App() {
             positionCards={positionCards}
             isStepping={isStepping}
             latestTurn={latestTurn}
+            papers={papers}
           />
         )}
 
