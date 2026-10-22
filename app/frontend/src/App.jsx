@@ -233,25 +233,40 @@ export default function App() {
     }
   };
 
-  const handleLaunchDebate = async (targetPapers, prompt) => {
-    const res = await fetch(`${API_BASE}/debate/launch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paper_ids: targetPapers, user_query: prompt }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setDebateSession(data);
-      setTurns([]);
-      setActiveTab('council');
+  const handleLaunchDebate = async (targetPapers, promptText) => {
+    const papersToUse = (targetPapers && targetPapers.length >= 2) ? targetPapers : (trayPapers.length >= 2 ? trayPapers : (papers.slice(0, 2).map(p => p.paper_id || p.id)));
+    const query = promptText || 'Compare quadratic attention vs selective state space for long contexts on Apple Silicon.';
+    try {
+      const res = await fetch(`${API_BASE}/debate/launch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paper_ids: papersToUse, user_query: query }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDebateSession(data);
+        setTurns([]);
+        setLatestTurn(null);
+        setActiveTab('council');
+        return data;
+      }
+    } catch (err) {
+      console.error('Failed to launch debate:', err);
     }
+    return null;
   };
 
   const handleStepTurn = async () => {
-    if (!debateSession?.debate_id) return;
+    let currentDebateId = debateSession?.debate_id;
+    if (!currentDebateId) {
+      const session = await handleLaunchDebate(trayPapers);
+      currentDebateId = session?.debate_id;
+    }
+    if (!currentDebateId) return;
+
     setIsStepping(true);
     try {
-      const res = await fetch(`${API_BASE}/debate/${debateSession.debate_id}/step`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/debate/${currentDebateId}/step`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         if (data.turn) {
@@ -259,23 +274,34 @@ export default function App() {
           setLatestTurn(data.turn);
         }
       }
+    } catch (err) {
+      console.error('Failed to step turn:', err);
     } finally {
       setIsStepping(false);
     }
   };
 
   const handleRunDebate = async () => {
-    if (!debateSession?.debate_id) return;
+    let currentDebateId = debateSession?.debate_id;
+    // If no debate or previous debate completed, launch a fresh one
+    if (!currentDebateId || debateSession?.status === 'completed' || turns.some(t => t.turn_type === 'final_synthesis' || t.turn_type === 'synthesis')) {
+      const session = await handleLaunchDebate(trayPapers);
+      currentDebateId = session?.debate_id;
+    }
+    if (!currentDebateId) return;
+
     setIsStepping(true);
     try {
-      const res = await fetch(`${API_BASE}/debate/${debateSession.debate_id}/run`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/debate/${currentDebateId}/run`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        setTurns(data.turns);
-        if (data.turns?.length > 0) {
+        if (data.turns && data.turns.length > 0) {
+          setTurns(data.turns);
           setLatestTurn(data.turns[data.turns.length - 1]);
         }
       }
+    } catch (err) {
+      console.error('Failed to run debate:', err);
     } finally {
       setIsStepping(false);
     }
@@ -292,7 +318,7 @@ export default function App() {
   const memoryMb = (hardware.rss_gb + hardware.metal_gb) * 1024.0;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100vh', display: 'flex', overflow: 'hidden', background: '#030405', color: '#e4ebf1' }}>
       {/* Left Vertical Stark UI Sidebar */}
       <Navigation
         activeTab={activeTab}
@@ -305,7 +331,7 @@ export default function App() {
 
       {/* Right Main Operating Chamber */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', padding: '12px 16px 12px 12px' }}>
-        <main style={{ flex: 1, overflowY: 'auto' }}>
+        <main style={{ flex: 1, overflowY: (activeTab === 'council' || activeTab === 'shelf') ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {activeTab === 'session' && (
             <NewSessionView
               onStartSession={handleStartSession}

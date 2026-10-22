@@ -135,7 +135,7 @@ export default function ShelfView({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', padding: '0 16px 16px', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, padding: 0, position: 'relative' }}>
       {/* Top Filter Chips & Search Bar (Augma Spec) */}
       <div style={{
         display: 'flex',
@@ -281,10 +281,13 @@ export default function ShelfView({
 
             if (!isVisible) return null;
 
-            const rotateY = offset * -26;
-            const translateZ = isCenter ? 80 : -140 * Math.abs(offset);
-            const translateX = offset * 280;
-            const opacity = isCenter ? 1 : isNear ? 0.6 : 0.25;
+            const rotateY = offset * -28;
+            const translateZ = isCenter ? 90 : -160 * Math.abs(offset);
+            const translateX = offset * 430;
+            const opacity = isCenter ? 1 : isNear ? 0.72 : 0.35;
+
+            // Safe abstract / TLDR fallback
+            const summaryText = paper.tldr || (paper.abstract ? `${paper.abstract.slice(0, 95)}...` : (paper.authors ? `Authors: ${paper.authors}` : 'Sovereign peer-reviewed preprint.'));
 
             return (
               <div
@@ -302,8 +305,8 @@ export default function ShelfView({
                   transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
                   opacity,
                   border: isCenter ? '1.5px solid var(--red)' : '1px solid var(--line)',
-                  boxShadow: isCenter ? '0 0 35px rgba(200, 16, 46, 0.4)' : 'none',
-                  background: isCenter ? 'rgba(3, 4, 5, 0.88)' : 'rgba(3, 4, 5, 0.65)',
+                  boxShadow: isCenter ? '0 0 40px rgba(200, 16, 46, 0.45)' : 'none',
+                  background: isCenter ? 'rgba(3, 4, 5, 0.94)' : 'rgba(3, 4, 5, 0.75)',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -341,7 +344,7 @@ export default function ShelfView({
                 {/* Card Title & Abstract */}
                 <div style={{ position: 'relative', zIndex: 2 }}>
                   <h3 style={{
-                    fontSize: '1.1rem',
+                    fontSize: '1.05rem',
                     fontWeight: 600,
                     color: 'var(--hi)',
                     letterSpacing: '0.02em',
@@ -356,7 +359,7 @@ export default function ShelfView({
                     lineHeight: '1.5',
                     fontFamily: 'var(--font-sans)',
                   }}>
-                    {paper.tldr || paper.abstract?.slice(0, 95) + '...'}
+                    {summaryText}
                   </p>
                 </div>
 

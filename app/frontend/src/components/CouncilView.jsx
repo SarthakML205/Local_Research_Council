@@ -14,6 +14,7 @@ import {
   ChevronRight,
   X,
   ExternalLink,
+  RotateCcw,
 } from 'lucide-react';
 
 const STARK_ADVOCATES = [
@@ -261,7 +262,7 @@ export default function CouncilView({
   const conclusionText = finalTurn?.text || '';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', height: 'calc(100vh - 100px)', padding: '0 16px 16px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '16px', height: '100%', minHeight: 0, padding: 0 }}>
       {/* Left Main Chamber: Virtual Parliamentary Arena */}
       <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Top Header / Council Controls */}
@@ -305,220 +306,221 @@ export default function CouncilView({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {!hasDebate ? (
-              <button
-                className="btn-primary"
-                onClick={() => onLaunchDebate(trayPapers, prompt)}
-                disabled={trayPapers.length < 2}
-                style={{ padding: '8px 20px', fontSize: '0.85rem' }}
-              >
-                <Play size={15} /> Convene Council ({trayPapers.length} Papers)
-              </button>
-            ) : (
-              <>
-                <button
-                  className="btn-secondary"
-                  onClick={onStepTurn}
-                  disabled={isStepping || isCompleted}
-                  style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-                >
-                  <SkipForward size={15} /> Advance Speaker Turn
-                </button>
-                <button
-                  className="btn-primary"
-                  onClick={onRunDebate}
-                  disabled={isStepping || isCompleted}
-                  style={{ padding: '8px 18px', fontSize: '0.85rem' }}
-                >
-                  <Play size={15} /> Auto-Run Debate
-                </button>
-              </>
-            )}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="btn-stark"
+              onClick={() => onLaunchDebate(trayPapers, prompt)}
+              style={{ padding: '6px 14px', fontSize: '0.75rem' }}
+              title="Reset and launch a fresh multi-agent council"
+            >
+              <RotateCcw size={13} /> {hasDebate ? 'RE-CONVENE' : `CONVENE (${trayPapers.length} PAPERS)`}
+            </button>
+            <button
+              className="btn-stark"
+              onClick={onStepTurn}
+              disabled={isStepping || isCompleted}
+              style={{ padding: '6px 14px', fontSize: '0.75rem' }}
+              title="Advance exactly one dialectic turn"
+            >
+              <SkipForward size={13} /> STEP TURN
+            </button>
+            <button
+              className="btn-stark pri"
+              onClick={onRunDebate}
+              disabled={isStepping}
+              style={{ padding: '6px 18px', fontSize: '0.75rem', fontWeight: 700 }}
+              title="Run full dialectical debate to consensus"
+            >
+              <Play size={13} /> {isStepping ? 'DEBATING...' : (isCompleted ? 'NEW DEBATE RUN' : 'AUTO-RUN DEBATE')}
+            </button>
           </div>
         </div>
 
-        {/* Real-Life Council Chamber Dais / Speaker Podiums */}
-        {hasDebate && (
+        {/* Real-Life Council Chamber Dais / Speaker Podiums (Always Visible) */}
+        <div style={{
+          padding: '16px 20px',
+          background: 'linear-gradient(180deg, rgba(8, 12, 18, 0.95) 0%, rgba(3, 4, 5, 0.98) 100%)',
+          borderBottom: '1px solid var(--line-faint)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}>
+          {/* Center Dais: J.A.R.V.I.S. (Chancellor) */}
           <div style={{
-            padding: '16px 20px',
-            background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(3, 7, 18, 0.95) 100%)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: currentSpeakerId === 'moderator' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(3, 4, 5, 0.7)',
+            border: currentSpeakerId === 'moderator' ? '1.5px solid #fbbf24' : '1px solid var(--line)',
+            borderRadius: '6px',
+            padding: '10px 18px',
+            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: currentSpeakerId === 'moderator' ? '0 0 25px rgba(251, 191, 36, 0.3)' : 'none',
           }}>
-            {/* Center Dais: J.A.R.V.I.S. (Chancellor) */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: currentSpeakerId === 'moderator' ? 'rgba(251, 191, 36, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-              border: currentSpeakerId === 'moderator' ? '1.5px solid #fbbf24' : '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '12px',
-              padding: '10px 18px',
-              transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-              boxShadow: currentSpeakerId === 'moderator' ? '0 0 25px rgba(251, 191, 36, 0.3)' : 'none',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  className={currentSpeakerId === 'moderator' ? 'star-avatar arc-reactor-active' : 'star-avatar'}
-                  style={{
-                    width: '38px',
-                    height: '38px',
-                    background: 'radial-gradient(circle, rgba(251, 191, 36, 0.3) 0%, rgba(0, 0, 0, 0.6) 100%)',
-                    border: '1.5px solid #fbbf24',
-                    color: '#fbbf24',
-                    fontSize: '1.25rem',
-                  }}
-                >
-                  ❂
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#fef08a', letterSpacing: '0.04em' }}>
-                      J.A.R.V.I.S.
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: '#fbbf24', fontFamily: 'var(--font-mono)' }}>
-                      [CHANCELLOR &amp; CONSENSUS ARBITER]
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                    Grounding Verifier · Dynamically routes clashes, cross-examinations, and consensus synthesis
-                  </p>
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                className={currentSpeakerId === 'moderator' ? 'star-avatar arc-reactor-active' : 'star-avatar'}
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  background: 'radial-gradient(circle, rgba(251, 191, 36, 0.3) 0%, rgba(0, 0, 0, 0.8) 100%)',
+                  border: '1.5px solid #fbbf24',
+                  color: '#fbbf24',
+                  fontSize: '1.25rem',
+                }}
+              >
+                ❂
               </div>
-
-              {currentSpeakerId === 'moderator' ? (
+              <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Volume2 size={16} color="#fbbf24" style={{ animation: 'pulse 1s infinite' }} />
-                  <span className="badge badge-amber" style={{ fontSize: '0.72rem', fontWeight: 800 }}>
-                    CHANCELLOR HAS THE FLOOR
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fef08a', letterSpacing: '0.04em' }}>
+                    J.A.R.V.I.S.
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#fbbf24', fontFamily: 'var(--font-mono)' }}>
+                    [CHANCELLOR &amp; CONSENSUS ARBITER]
                   </span>
                 </div>
-              ) : (
-                <span className="badge" style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                  Auditing Dialectical Trajectory
+                <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                  Grounding Verifier · Dynamically routes clashes, cross-examinations, and consensus synthesis
+                </p>
+              </div>
+            </div>
+
+            {currentSpeakerId === 'moderator' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Volume2 size={16} color="#fbbf24" style={{ animation: 'pulse 1s infinite' }} />
+                <span className="badge badge-amber" style={{ fontSize: '0.72rem', fontWeight: 800 }}>
+                  CHANCELLOR HAS THE FLOOR
                 </span>
-              )}
-            </div>
-
-            {/* Semicircle Advocate Podiums (Stark UI Holographic Cards) */}
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(2, trayPapers.length)}, 1fr)`, gap: '12px' }}>
-              {trayPapers.map((pid, idx) => {
-                const persona = getAdvocatePersona(idx, pid);
-                const paper = getPaperDetails(pid);
-                const isSpeaking = currentSpeakerId === `advocate:${pid}` || latestTurn?.paper_id === pid;
-                const isTarget = currentTargetId === `advocate:${pid}`;
-
-                return (
-                  <div
-                    key={pid}
-                    className="plate"
-                    style={{
-                      background: isSpeaking ? 'rgba(3, 4, 5, 0.9)' : 'rgba(3, 4, 5, 0.65)',
-                      border: isSpeaking
-                        ? '1.5px solid var(--red)'
-                        : isTarget
-                        ? '1.5px dashed var(--red)'
-                        : '1px solid var(--line)',
-                      borderRadius: '6px',
-                      padding: '14px 16px',
-                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isSpeaking ? '0 0 35px rgba(200, 16, 46, 0.45)' : 'none',
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      minHeight: '140px',
-                    }}
-                  >
-                    {/* Top Row: Index & Stark AI Codename */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1.1rem', fontFamily: 'var(--font-display)', color: isSpeaking ? 'var(--red)' : 'var(--hi)', fontWeight: 600 }}>
-                          0{idx + 1}
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ color: persona.color, fontWeight: 900 }}>{persona.symbol}</span>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.04em' }}>
-                            {persona.name}
-                          </span>
-                        </div>
-                      </div>
-
-                      {isSpeaking ? (
-                        <span
-                          className="chip on"
-                          style={{
-                            fontSize: '0.65rem',
-                            padding: '2px 8px',
-                            color: 'var(--hi)',
-                            borderColor: 'var(--red)',
-                            fontWeight: 800,
-                          }}
-                        >
-                          SPEAKING
-                        </span>
-                      ) : isTarget ? (
-                        <span
-                          className="chip"
-                          style={{
-                            fontSize: '0.65rem',
-                            padding: '2px 8px',
-                            color: 'var(--red)',
-                            borderColor: 'var(--red)',
-                            fontWeight: 800,
-                          }}
-                        >
-                          CROSS-EXAMINED
-                        </span>
-                      ) : (
-                        <span className="chip" style={{ fontSize: '0.62rem', padding: '2px 6px', color: 'var(--mute)' }}>
-                          DEFENDING
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Paper Title & Methodology */}
-                    <div style={{ marginBottom: '8px' }}>
-                      <p style={{
-                        fontSize: '0.82rem',
-                        fontWeight: 600,
-                        color: 'var(--hi)',
-                        lineHeight: '1.4',
-                        marginBottom: '4px',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }} title={paper.title || pid}>
-                        {paper.title || pid}
-                      </p>
-                      <p style={{ fontSize: '0.72rem', color: persona.color, fontWeight: 600 }}>
-                        {persona.title}
-                      </p>
-                    </div>
-
-                    {/* Bottom Metadata Strip */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid var(--line-faint)',
-                      paddingTop: '6px',
-                      fontSize: '0.65rem',
-                      fontFamily: 'var(--font-mono)',
-                      color: 'var(--dim)',
-                    }}>
-                      <span>STACK <b style={{ color: 'var(--hi)', fontWeight: 400 }}>M5 · MLX</b></span>
-                      <span>PARTITION <b style={{ color: '#10b981', fontWeight: 600 }}>QDRANT P{idx + 1}</b></span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              </div>
+            ) : (
+              <span className="chip" style={{ fontSize: '0.65rem', color: 'var(--txt)' }}>
+                {hasDebate ? 'AUDITING DIALECTIC' : 'STANDBY // READY'}
+              </span>
+            )}
           </div>
-        )}
+
+          {/* Semicircle Advocate Podiums (Stark UI Holographic Cards) */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(auto-fit, minmax(200px, 1fr))`,
+            gap: '12px',
+          }}>
+            {trayPapers.map((pid, idx) => {
+              const persona = getAdvocatePersona(idx, pid);
+              const paper = getPaperDetails(pid);
+              const isSpeaking = currentSpeakerId === `advocate:${pid}` || latestTurn?.paper_id === pid;
+              const isTarget = currentTargetId === `advocate:${pid}`;
+
+              return (
+                <div
+                  key={pid}
+                  className="plate"
+                  style={{
+                    background: isSpeaking ? 'rgba(3, 4, 5, 0.95)' : 'rgba(3, 4, 5, 0.72)',
+                    border: isSpeaking
+                      ? '1.5px solid var(--red)'
+                      : isTarget
+                      ? '1.5px dashed var(--red)'
+                      : '1px solid var(--line)',
+                    borderRadius: '6px',
+                    padding: '12px 16px',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxShadow: isSpeaking ? '0 0 35px rgba(200, 16, 46, 0.45)' : 'none',
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    minHeight: '140px',
+                  }}
+                >
+                  {/* Top Row: Index & Stark AI Codename */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem', fontFamily: 'var(--font-display)', color: isSpeaking ? 'var(--red)' : 'var(--hi)', fontWeight: 600 }}>
+                        0{idx + 1}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: persona.color, fontWeight: 900 }}>{persona.symbol}</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f8fafc', letterSpacing: '0.04em' }}>
+                          {persona.name}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isSpeaking ? (
+                      <span
+                        className="chip on"
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 8px',
+                          color: 'var(--hi)',
+                          borderColor: 'var(--red)',
+                          fontWeight: 800,
+                        }}
+                      >
+                        SPEAKING
+                      </span>
+                    ) : isTarget ? (
+                      <span
+                        className="chip"
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 8px',
+                          color: 'var(--red)',
+                          borderColor: 'var(--red)',
+                          fontWeight: 800,
+                        }}
+                      >
+                        CROSS-EXAMINED
+                      </span>
+                    ) : (
+                      <span className="chip" style={{ fontSize: '0.62rem', padding: '2px 6px', color: 'var(--mute)' }}>
+                        {hasDebate ? 'DEFENDING' : 'STANDBY'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Paper Title & Methodology */}
+                  <div style={{ marginBottom: '8px' }}>
+                    <p style={{
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: 'var(--hi)',
+                      lineHeight: '1.3',
+                      marginBottom: '4px',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      height: '34px',
+                    }} title={paper.title || pid}>
+                      {paper.title || pid}
+                    </p>
+                    <p style={{ fontSize: '0.72rem', color: persona.color, fontWeight: 600 }}>
+                      {persona.title}
+                    </p>
+                  </div>
+
+                  {/* Bottom Metadata Strip */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderTop: '1px solid var(--line-faint)',
+                    paddingTop: '6px',
+                    fontSize: '0.65rem',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--dim)',
+                  }}>
+                    <span>STACK <b style={{ color: 'var(--hi)', fontWeight: 400 }}>M5 · MLX</b></span>
+                    <span>PARTITION <b style={{ color: '#10b981', fontWeight: 600 }}>QDRANT P{idx + 1}</b></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Dynamic Debate Transcript Stream */}
         <div style={{
@@ -529,7 +531,7 @@ export default function CouncilView({
           flexDirection: 'column',
           gap: '20px',
         }}>
-          {!hasDebate && (
+          {(!hasDebate || turns.length === 0) && (
             <div style={{
               margin: 'auto',
               textAlign: 'center',
