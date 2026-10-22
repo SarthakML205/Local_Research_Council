@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     COUNCIL_MAX_PAPERS: int = Field(default=6, description="Default maximum papers (configurable up to 10)")
     COUNCIL_ROUNDS: int = Field(default=3, description="Default debate cross-examination rounds")
 
+    # arXiv Search & Widen-and-Rerank Pipeline
+    ARXIV_SEARCH_CATEGORIES: list[str] = Field(
+        default=["cs.AI", "cs.CL", "cs.LG", "cs.MA"],
+        description="Default categories for domain-constrained arXiv search",
+    )
+    ARXIV_CANDIDATE_POOL_SIZE: int = Field(default=30, description="Candidate pool size for widen-and-rerank")
+    ARXIV_SCORE_THRESHOLD: float = Field(default=0.15, description="Minimum confidence score threshold")
+
     # PDF Slicing & Chunking Bounds
     PDF_MAX_PAGES: int = Field(default=8, description="First 6-8 pages sliced before references")
     CHUNK_MIN_TOKENS: int = Field(default=256, description="Minimum tokens per structural chunk")
