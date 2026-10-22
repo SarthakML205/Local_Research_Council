@@ -1,46 +1,185 @@
-/* LRC Sci-Fi Sovereign Design System */
+/* LRC Sovereign Sci-Fi Operator Design System (Stark UI 26 / Augma Spec) */
 :root {
-  --bg-dark: #07090e;
-  --bg-card: rgba(18, 24, 38, 0.7);
-  --bg-card-hover: rgba(28, 38, 58, 0.85);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(56, 189, 248, 0.35);
+  /* Augma / Stark UI 26 color palette */
+  --void: #000000;
+  --bg: #030405;
+  --panel: #0d121a;
+  --panel2: #141b24;
+  --panel-lit: #222c3a;
+  --grid: rgba(160, 180, 200, 0.05);
+  --line: rgba(200, 214, 226, 0.22);
+  --line-faint: rgba(200, 214, 226, 0.08);
+  --hair: rgba(200, 214, 226, 0.5);
+
+  --txt: #9aa6b2;
+  --hi: #e4ebf1;
+  --dim: #4c5866;
+  --mute: #7b8692;
+  --red: #c8102e;
+  --red-ghost: rgba(200, 16, 46, 0.35);
+  --blue: #5aa9dc;
+  --deep: #2b5d82;
+  --glow: #080a0d;
+
+  --bg-dark: #030405;
+  --bg-card: rgba(13, 18, 26, 0.78);
+  --bg-card-hover: rgba(20, 27, 36, 0.92);
+  --border-color: rgba(200, 214, 226, 0.14);
+  --border-glow: rgba(90, 169, 220, 0.4);
 
   --cyan: #38bdf8;
-  --cyan-glow: rgba(56, 189, 248, 0.2);
+  --cyan-glow: rgba(56, 189, 248, 0.25);
   --emerald: #10b981;
   --violet: #a855f7;
   --amber: #f59e0b;
-  --rose: #f43f5e;
+  --rose: #c8102e;
 
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-main: #e4ebf1;
+  --text-muted: #9aa6b2;
+  --text-dim: #4c5866;
 
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-display: 'Outfit', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Rajdhani', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: 'Rajdhani', 'Outfit', sans-serif;
+  --font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  --track-wide: 0.12em;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Stark UI 26 Plate Mechanics (red 14px tick on top-left, hi tick top-right) */
+.plate {
+  position: relative;
+  background: rgba(3, 4, 5, 0.72);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-body {
-  background-color: var(--bg-dark);
-  color: var(--text-main);
-  font-family: var(--font-sans);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
-  overflow-x: hidden;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.06) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.03) 0px, transparent 50%);
-  background-attachment: fixed;
+.plate::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 14px;
+  width: 14px;
+  height: 2px;
+  background: var(--red);
+}
+
+.plate::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 8px;
+  height: 2px;
+  background: var(--hi);
+}
+
+/* Stark UI 26 Chips & Corner Brackets */
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  color: var(--hi);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: var(--track-wide);
+  background: rgba(3, 4, 5, 0.65);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chip::before, .chip::after, .btn-stark::before, .btn-stark::after {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--hi);
+}
+
+.chip::before, .btn-stark::before {
+  top: -3px;
+  left: -3px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.chip::after, .btn-stark::after {
+  bottom: -3px;
+  right: -3px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.chip:hover, .btn-stark:hover {
+  border-color: var(--hair);
+  color: var(--hi);
+  background: rgba(200, 214, 226, 0.08);
+}
+
+.chip.on, .btn-stark.pri {
+  border-color: var(--hair);
+  box-shadow: inset 0 -2px 0 var(--red);
+  background: rgba(200, 16, 46, 0.14);
+}
+
+.btn-stark {
+  position: relative;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: var(--track-wide);
+  color: var(--hi);
+  border: 1px solid var(--line);
+  background: rgba(200, 214, 226, 0.04);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* Floating Tabular Inspector HUD */
+.hud-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 38px;
+  padding: 0 18px;
+  border-top: 1px solid var(--line-faint);
+  background: rgba(3, 4, 5, 0.85);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: var(--track-wide);
+  color: var(--dim);
+}
+
+.hud-bar .idc {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.hud-bar .nm {
+  color: var(--hi);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.hud-bar .stat {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+}
+
+.hud-bar .stat b {
+  color: var(--hi);
+  font-weight: 400;
+  margin-left: 4px;
 }
 
 /* Glassmorphism Cards */

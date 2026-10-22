@@ -1,73 +1,139 @@
-import React, { useState, useMemo } from 'react';
-import { Layers, Sparkles, BookOpen, ExternalLink, ArrowRight, CheckCircle2, ShieldCheck, Network, Info } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Layers,
+  Sparkles,
+  BookOpen,
+  ExternalLink,
+  ArrowRight,
+  CheckCircle2,
+  ShieldCheck,
+  Network,
+  Info,
+  Maximize2,
+  Clock,
+  Cpu,
+  Terminal,
+  ChevronRight,
+  Database,
+  Flame,
+} from 'lucide-react';
 
-export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
+export default function DiscoveryView({ graph, onStageToTray, trayPapers = [] }) {
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [currentTime, setCurrentTime] = useState('--:--:--');
+
+  // Live HUD clock
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      setCurrentTime(now.toTimeString().split(' ')[0]);
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const nodes = useMemo(() => {
     if (graph?.nodes && graph.nodes.length > 0) return graph.nodes;
     return [
-      { id: 'p_attn', label: 'Attention Is All You Need', type: 'paper', study_rank: 1, color: '#38bdf8', summary: 'Multi-head self-attention replaces recurrence entirely.' },
-      { id: 'p_mamba', label: 'Mamba: Linear-Time Sequence Modeling', type: 'paper', study_rank: 2, color: '#a855f7', summary: 'Selective state spaces achieve linear scaling without quadratic attention.' },
-      { id: 'prereq_linalg', label: 'Linear Algebra & Projections', type: 'prerequisite', color: '#10b981', summary: 'Fundamental matrix operations and multi-head projections.' },
-      { id: 'field_hardware', label: 'Hardware-Aware Deep Learning', type: 'field', color: '#f59e0b', summary: 'Kernel IO efficiency and unified memory cache hierarchies.' },
+      {
+        id: 'p_attn',
+        label: 'Attention Is All You Need',
+        type: 'paper',
+        study_rank: 1,
+        color: '#38bdf8',
+        idc: 'LRC-P-01',
+        summary: 'Multi-head self-attention replaces recurrence entirely, enabling dense global associative recall.',
+        stack: 'PyTorch · Attention',
+        status: 'Foundational',
+      },
+      {
+        id: 'p_mamba',
+        label: 'Mamba: Linear-Time Sequence Modeling',
+        type: 'paper',
+        study_rank: 2,
+        color: '#a855f7',
+        idc: 'LRC-P-02',
+        summary: 'Selective state spaces achieve linear-time scaling without maintaining quadratic KV-cache.',
+        stack: 'MLX · Selective SSM',
+        status: 'SOTA Recurrence',
+      },
+      {
+        id: 'prereq_linalg',
+        label: 'Linear Algebra & State Space Projections',
+        type: 'prerequisite',
+        color: '#10b981',
+        idc: 'LRC-REQ-01',
+        summary: 'Continuous-to-discrete bilinear transforms (zero-order hold discretization) and matrix exponentials.',
+        stack: 'Math Foundation',
+        status: 'Prerequisite',
+      },
+      {
+        id: 'field_hardware',
+        label: 'Hardware-Aware Deep Learning on Apple Metal',
+        type: 'field',
+        color: '#f59e0b',
+        idc: 'LRC-SYS-01',
+        summary: 'Unified Memory architecture, eliminating PCIe host-to-device copying and maximizing Metal L2 cache residency.',
+        stack: 'Apple Silicon M5',
+        status: 'Core Target',
+      },
     ];
   }, [graph]);
 
   const edges = useMemo(() => {
     if (graph?.edges && graph.edges.length > 0) return graph.edges;
     return [
-      { id: 'e1', source: 'prereq_linalg', target: 'p_attn', relation: 'prerequisite_for', confidence: 0.95 },
-      { id: 'e2', source: 'p_mamba', target: 'p_attn', relation: 'extends', confidence: 0.88 },
-      { id: 'e3', source: 'p_mamba', target: 'field_hardware', relation: 'subfield_of', confidence: 0.82 },
+      { id: 'e1', source: 'prereq_linalg', target: 'p_attn', relation: 'prerequisite_for', confidence: 0.96 },
+      { id: 'e2', source: 'p_mamba', target: 'p_attn', relation: 'extends', confidence: 0.89 },
+      { id: 'e3', source: 'p_mamba', target: 'field_hardware', relation: 'subfield_of', confidence: 0.84 },
     ];
   }, [graph]);
 
-  // Dynamically compute clean, non-overlapping coordinates for any arbitrary graph
+  // Compute neat 2D grid coordinates for graph nodes
   const nodePositions = useMemo(() => {
     const positions = {};
     const width = 860;
-    const height = 580;
 
     const prerequisites = nodes.filter(n => n.type === 'prerequisite');
     const papers = nodes.filter(n => n.type === 'paper');
     const fields = nodes.filter(n => n.type === 'field');
     const others = nodes.filter(n => !['prerequisite', 'paper', 'field'].includes(n.type));
 
-    // 1. Prerequisites along Top Tier (Y ~ 100-140)
+    // 1. Prerequisites along Top Tier (Y ~ 100)
     prerequisites.forEach((n, idx) => {
       const step = width / (prerequisites.length + 1);
       positions[n.id] = {
         x: Math.round(step * (idx + 1)),
-        y: 110 + (idx % 2 === 0 ? 0 : 35),
+        y: 110 + (idx % 2 === 0 ? 0 : 30),
       };
     });
 
-    // 2. Papers across the Central Hero Tier (Y ~ 270-340)
+    // 2. Papers across the Central Hero Tier (Y ~ 270)
     papers.forEach((n, idx) => {
       const step = width / (papers.length + 1);
       positions[n.id] = {
         x: Math.round(step * (idx + 1)),
-        y: 290 + (idx % 2 === 0 ? -25 : 30),
+        y: 280 + (idx % 2 === 0 ? -20 : 25),
       };
     });
 
-    // 3. Fields along Bottom Tier (Y ~ 470-510)
+    // 3. Fields along Bottom Tier (Y ~ 460)
     fields.forEach((n, idx) => {
       const step = width / (fields.length + 1);
       positions[n.id] = {
         x: Math.round(step * (idx + 1)),
-        y: 480 + (idx % 2 === 0 ? 0 : 30),
+        y: 460 + (idx % 2 === 0 ? 0 : 25),
       };
     });
 
-    // 4. Any remaining nodes
+    // 4. Others
     others.forEach((n, idx) => {
       const step = width / (others.length + 1);
       positions[n.id] = {
         x: Math.round(step * (idx + 1)),
-        y: 390,
+        y: 370,
       };
     });
 
@@ -76,62 +142,62 @@ export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
 
   const activeNode = nodes.find(n => n.id === selectedNodeId) || nodes.find(n => n.type === 'paper') || nodes[0];
   const isPaperStaged = activeNode?.type === 'paper' && trayPapers?.includes(activeNode.id);
-
-  // Filter relationships connected to the active node
   const connectedEdges = edges.filter(e => e.source === activeNode?.id || e.target === activeNode?.id);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '20px', height: 'calc(100vh - 100px)', padding: '0 16px 16px' }}>
-      {/* Left Canvas: Sci-Fi Mind Map */}
-      <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-        {/* Pedagogical Study Order Ribbon */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: '20px', height: 'calc(100vh - 100px)', padding: '0 16px 16px' }}>
+      {/* Left Canvas: Minimalist Sci-Fi Operator Console */}
+      <div className="plate" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', borderRadius: '12px' }}>
+        {/* Top Header / Operator Strip */}
         <div style={{
-          padding: '14px 20px',
-          borderBottom: '1px solid var(--border-color)',
-          background: 'rgba(0, 0, 0, 0.3)',
+          padding: '12px 20px',
+          borderBottom: '1px solid var(--line-faint)',
+          background: 'rgba(3, 4, 5, 0.75)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Network size={18} color="#38bdf8" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f8fafc' }}>
-              Pedagogical Curriculum Mind Map
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.75rem',
+              color: 'var(--red)',
+              letterSpacing: 'var(--track-wide)',
+              fontWeight: 700,
+            }}>
+              LRC // OPERATOR CONSOLE
+            </span>
+            <span style={{ color: 'var(--dim)' }}>·</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--hi)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Pedagogical Curriculum &amp; Mind Map
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', maxWidth: '500px' }}>
+
+          {/* Quick study rank pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', maxWidth: '480px' }}>
             {nodes.filter(n => n.type === 'paper').map((p, idx) => (
-              <React.Fragment key={p.id}>
-                <button
-                  className="badge"
-                  style={{
-                    background: activeNode?.id === p.id ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                    border: activeNode?.id === p.id ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
-                    color: activeNode?.id === p.id ? '#38bdf8' : '#cbd5e1',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    padding: '4px 10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                  onClick={() => setSelectedNodeId(p.id)}
-                >
-                  <span style={{ fontWeight: 800 }}>#{idx + 1}</span>
-                  <span>{p.label.length > 20 ? `${p.label.slice(0, 20)}...` : p.label}</span>
-                </button>
-                {idx < nodes.filter(n => n.type === 'paper').length - 1 && (
-                  <ArrowRight size={12} color="var(--text-dim)" />
-                )}
-              </React.Fragment>
+              <button
+                key={p.id}
+                className={`chip ${activeNode?.id === p.id ? 'on' : ''}`}
+                style={{ fontSize: '0.7rem', padding: '4px 10px', height: '28px' }}
+                onClick={() => setSelectedNodeId(p.id)}
+              >
+                <b>0{idx + 1}</b>
+                <span>{p.label.length > 18 ? `${p.label.slice(0, 18)}...` : p.label}</span>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Dynamic SVG Mind Map Canvas */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'radial-gradient(ellipse at 50% 50%, rgba(15, 23, 42, 0.6) 0%, rgba(3, 7, 18, 0.95) 100%)' }}>
+        {/* Dynamic SVG Mind Map Canvas with Stark UI 26 Aesthetics */}
+        <div style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          background: 'radial-gradient(ellipse at 50% 50%, rgba(13, 18, 26, 0.6) 0%, rgba(3, 4, 5, 0.98) 100%)',
+        }}>
           <svg
-            viewBox="0 0 860 580"
+            viewBox="0 0 860 560"
             style={{ width: '100%', height: '100%', display: 'block' }}
           >
             <defs>
@@ -140,23 +206,27 @@ export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
                 <stop offset="100%" stopColor="#a855f7" stopOpacity="0.85" />
               </linearGradient>
               <linearGradient id="edge-prereq-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.8" />
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.85" />
               </linearGradient>
               <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feGaussianBlur stdDeviation="5" result="blur" />
                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
               </filter>
             </defs>
 
-            {/* Background Grid Pattern */}
-            <g opacity="0.08">
-              {[...Array(9)].map((_, i) => (
-                <line key={`vl-${i}`} x1={i * 100} y1="0" x2={i * 100} y2="580" stroke="#38bdf8" strokeWidth="1" />
-              ))}
-              {[...Array(6)].map((_, i) => (
-                <line key={`hl-${i}`} x1="0" y1={i * 100} x2="860" y2={i * 100} stroke="#38bdf8" strokeWidth="1" />
-              ))}
+            {/* Precision Grid Crosses */}
+            <g opacity="0.3">
+              {[120, 260, 400, 540, 680].map((x) =>
+                [100, 220, 340, 460].map((y) => (
+                  <path
+                    key={`cross-${x}-${y}`}
+                    d={`M ${x} ${y - 4} v 8 M ${x - 4} ${y} h 8`}
+                    stroke="rgba(200, 214, 226, 0.25)"
+                    strokeWidth="1"
+                  />
+                ))
+              )}
             </g>
 
             {/* Connecting Curved Edges */}
@@ -166,37 +236,37 @@ export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
               const midX = (src.x + dst.x) / 2;
               const midY = (src.y + dst.y) / 2 - 25;
               const isSelected = activeNode?.id === e.source || activeNode?.id === e.target;
-
               const strokeColor = e.relation === 'prerequisite_for' ? 'url(#edge-prereq-grad)' : 'url(#edge-paper-grad)';
 
               return (
-                <g key={e.id} opacity={isSelected ? 1 : 0.65}>
+                <g key={e.id} opacity={isSelected ? 1 : 0.45}>
                   <path
                     d={`M ${src.x} ${src.y} Q ${midX} ${midY} ${dst.x} ${dst.y}`}
                     fill="none"
                     stroke={strokeColor}
-                    strokeWidth={isSelected ? '3' : '2'}
-                    strokeDasharray={e.relation === 'prerequisite_for' ? '6 4' : 'none'}
+                    strokeWidth={isSelected ? '2.5' : '1.5'}
+                    strokeDasharray={e.relation === 'prerequisite_for' ? '5 4' : 'none'}
                     filter={isSelected ? 'url(#neon-glow)' : 'none'}
                   />
-                  {/* Edge Relation Pill */}
+                  {/* Relation Tag Pill */}
                   <rect
-                    x={midX - 44}
-                    y={midY - 10}
-                    width="88"
+                    x={midX - 42}
+                    y={midY - 9}
+                    width="84"
                     height="18"
-                    rx="9"
-                    fill="rgba(15, 23, 42, 0.9)"
-                    stroke="rgba(56, 189, 248, 0.4)"
+                    rx="3"
+                    fill="rgba(3, 4, 5, 0.95)"
+                    stroke="rgba(200, 214, 226, 0.3)"
                     strokeWidth="1"
                   />
                   <text
                     x={midX}
-                    y={midY + 3}
-                    fill="#94a3b8"
+                    y={midY + 4}
+                    fill="#e4ebf1"
                     fontSize="9"
                     fontFamily="var(--font-mono)"
                     textAnchor="middle"
+                    letterSpacing="0.05em"
                   >
                     {e.relation}
                   </text>
@@ -204,172 +274,244 @@ export default function DiscoveryView({ graph, onStageToTray, trayPapers }) {
               );
             })}
 
-            {/* Render Nodes */}
+            {/* Render Nodes with Stark Glowing Borders */}
             {nodes.map(n => {
-              const pos = nodePositions[n.id] || { x: 430, y: 290 };
+              const pos = nodePositions[n.id] || { x: 430, y: 280 };
               const isSelected = activeNode?.id === n.id;
               const isPaper = n.type === 'paper';
               const isPrereq = n.type === 'prerequisite';
 
-              const radius = isPaper ? 28 : (isPrereq ? 20 : 18);
-              const baseColor = n.color || (isPaper ? '#38bdf8' : (isPrereq ? '#10b981' : '#f59e0b'));
+              const width = isPaper ? 140 : 120;
+              const height = isPaper ? 54 : 44;
+              const baseColor = n.color || (isPaper ? '#38bdf8' : isPrereq ? '#10b981' : '#f59e0b');
 
               return (
                 <g
                   key={n.id}
-                  transform={`translate(${pos.x}, ${pos.y})`}
+                  transform={`translate(${pos.x - width / 2}, ${pos.y - height / 2})`}
                   onClick={() => setSelectedNodeId(n.id)}
                   style={{ cursor: 'pointer' }}
                 >
-                  {/* Outer Pulsing Halo when selected */}
+                  {/* Outer Glowing Halo */}
                   {isSelected && (
-                    <circle
-                      r={radius + 12}
+                    <rect
+                      x="-4"
+                      y="-4"
+                      width={width + 8}
+                      height={height + 8}
+                      rx="6"
                       fill="none"
                       stroke={baseColor}
-                      strokeWidth="2"
-                      opacity="0.5"
+                      strokeWidth="1.5"
+                      opacity="0.75"
                       filter="url(#neon-glow)"
                     />
                   )}
 
-                  {/* Node Background Disc */}
-                  <circle
-                    r={radius}
-                    fill="rgba(15, 23, 42, 0.95)"
-                    stroke={baseColor}
-                    strokeWidth={isSelected ? '3' : '2'}
+                  {/* Node Rect Plate */}
+                  <rect
+                    width={width}
+                    height={height}
+                    rx="4"
+                    fill="rgba(13, 18, 26, 0.9)"
+                    stroke={isSelected ? baseColor : 'rgba(200, 214, 226, 0.22)'}
+                    strokeWidth={isSelected ? '1.5' : '1'}
                   />
 
-                  {/* Inner Node Accent */}
-                  <circle
-                    r={radius - 6}
-                    fill={baseColor}
-                    opacity={isSelected ? 0.35 : 0.15}
-                  />
+                  {/* Corner Accent Ticks (Stark UI style) */}
+                  <line x1="0" y1="0" x2="8" y2="0" stroke={baseColor} strokeWidth="2" />
+                  <line x1="0" y1="0" x2="0" y2="8" stroke={baseColor} strokeWidth="2" />
+                  <line x1={width - 8} y1={height} x2={width} y2={height} stroke={baseColor} strokeWidth="2" />
+                  <line x1={width} y1={height - 8} x2={width} y2={height} stroke={baseColor} strokeWidth="2" />
 
-                  {/* Icon / Glyph */}
+                  {/* Node Content */}
                   <text
-                    y="4"
-                    fill="#ffffff"
-                    fontSize={isPaper ? '12' : '10'}
-                    fontFamily="var(--font-sans)"
-                    fontWeight="800"
-                    textAnchor="middle"
+                    x="10"
+                    y="16"
+                    fill={baseColor}
+                    fontSize="9"
+                    fontFamily="var(--font-mono)"
+                    fontWeight="700"
+                    letterSpacing="0.08em"
                   >
-                    {isPaper ? `P${n.study_rank || ''}` : (isPrereq ? 'REQ' : 'FLD')}
+                    {n.idc || (isPaper ? `P-0${n.study_rank || 1}` : 'NODE')}
                   </text>
 
-                  {/* Node Label Text */}
                   <text
-                    y={radius + 18}
-                    fill={isSelected ? '#ffffff' : '#cbd5e1'}
+                    x="10"
+                    y="32"
+                    fill="#e4ebf1"
                     fontSize="11"
                     fontFamily="var(--font-sans)"
-                    fontWeight={isSelected ? '700' : '500'}
-                    textAnchor="middle"
-                    style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                    fontWeight="600"
                   >
-                    {n.label.length > 28 ? `${n.label.slice(0, 26)}...` : n.label}
+                    {n.label.length > 16 ? `${n.label.slice(0, 16)}...` : n.label}
+                  </text>
+
+                  <text
+                    x="10"
+                    y="45"
+                    fill="var(--txt)"
+                    fontSize="8"
+                    fontFamily="var(--font-mono)"
+                  >
+                    {n.type.toUpperCase()}
                   </text>
                 </g>
               );
             })}
           </svg>
         </div>
+
+        {/* Tabular Inspector HUD Bar across bottom (Augma Spec #info) */}
+        <div className="hud-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="idc">{activeNode?.idc || 'LRC-OP-01'}</span>
+            <span className="nm">{activeNode?.label || 'Curriculum Node'}</span>
+            <span className="chip" style={{ height: '22px', padding: '0 8px', fontSize: '0.65rem' }}>
+              {activeNode?.type || 'paper'}
+            </span>
+          </div>
+
+          <div className="stat">
+            <span>Stack <b>{activeNode?.stack || 'Python 3.11 · MLX'}</b></span>
+            <span>Status <b>{activeNode?.status || 'Active'}</b></span>
+            <span>Security <b>100% LOCAL ZERO-CLOUD</b></span>
+            <span>CLOCK <b style={{ color: 'var(--red)' }}>{currentTime}</b></span>
+          </div>
+        </div>
       </div>
 
-      {/* Right Rail: Interactive Node Dossier */}
-      <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <span
-              className="badge"
-              style={{
-                background: `${activeNode?.color || '#38bdf8'}22`,
-                borderColor: activeNode?.color || '#38bdf8',
-                color: activeNode?.color || '#38bdf8',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-                fontWeight: 700,
-              }}
-            >
-              {activeNode?.type || 'Node'}
-            </span>
-            {activeNode?.study_rank && (
-              <span className="badge badge-cyan" style={{ fontSize: '0.7rem' }}>
-                Study Step #{activeNode.study_rank}
-              </span>
-            )}
-          </div>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', lineHeight: '1.4' }}>
-            {activeNode?.label}
-          </h3>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Node Summary */}
-          <div>
-            <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '8px' }}>
-              Synthesized Thesis / Concept
-            </h4>
-            <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#cbd5e1', background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-              {activeNode?.summary || 'Core academic contribution within the synthesized curriculum graph.'}
-            </p>
-          </div>
-
-          {/* Graph Relationships */}
-          <div>
-            <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '10px' }}>
-              Connected Relationships ({connectedEdges.length})
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {connectedEdges.map(e => {
-                const otherId = e.source === activeNode?.id ? e.target : e.source;
-                const otherNode = nodes.find(n => n.id === otherId);
-                const isOutgoing = e.source === activeNode?.id;
-
-                return (
-                  <div
-                    key={e.id}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: '1px solid rgba(255, 255, 255, 0.06)',
-                      borderRadius: '8px',
-                      padding: '10px 12px',
-                      fontSize: '0.8rem',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span className="badge badge-violet" style={{ fontSize: '0.65rem' }}>
-                        {e.relation}
-                      </span>
-                      <span style={{ fontSize: '0.7rem', color: '#10b981', fontFamily: 'var(--font-mono)' }}>
-                        {Math.round((e.confidence || 0.85) * 100)}% match
-                      </span>
-                    </div>
-                    <p style={{ color: '#f8fafc', fontWeight: 600 }}>
-                      {isOutgoing ? '↳ ' : '↰ '} {otherNode?.label || otherId}
-                    </p>
-                  </div>
-                );
-              })}
+      {/* Right Inspector Panel (Augma Spec #panel plate) */}
+      <div className="plate" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: '12px', padding: '24px 22px' }}>
+        {/* Panel Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '26px',
+              height: '26px',
+              border: '1px solid var(--hair)',
+              display: 'grid',
+              placeItems: 'center',
+              color: 'var(--hi)',
+              background: 'rgba(200, 214, 226, 0.05)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.75rem',
+            }}>
+              ⬡
             </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--red)', letterSpacing: 'var(--track-wide)', fontWeight: 700 }}>
+              {activeNode?.idc || 'AUG-LAB-01'}
+            </span>
+          </div>
+
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: 'var(--red)', fontWeight: 300 }}>
+            0{activeNode?.study_rank || 1}
+          </span>
+        </div>
+
+        {/* Title & Technical Summary */}
+        <h1 style={{
+          fontSize: '1.4rem',
+          fontWeight: 500,
+          color: 'var(--hi)',
+          letterSpacing: '0.04em',
+          lineHeight: '1.2',
+          marginBottom: '10px',
+        }}>
+          {activeNode?.label}
+        </h1>
+
+        <p style={{
+          fontSize: '0.85rem',
+          lineHeight: '1.6',
+          color: 'var(--txt)',
+          marginBottom: '20px',
+        }}>
+          {activeNode?.summary || 'Foundational architectural primitive providing theoretical boundaries for multi-agent academic debate.'}
+        </p>
+
+        {/* Tabular Metadata List (Augma DL style) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '12px 16px',
+          marginBottom: '24px',
+          padding: '14px',
+          background: 'rgba(3, 4, 5, 0.5)',
+          border: '1px solid var(--line-faint)',
+          borderRadius: '8px',
+        }}>
+          <div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: 'var(--track-wide)' }}>Type</span>
+            <p style={{ fontSize: '0.82rem', color: 'var(--hi)', fontWeight: 600, marginTop: '2px' }}>{activeNode?.type?.toUpperCase()}</p>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: 'var(--track-wide)' }}>Study Order</span>
+            <p style={{ fontSize: '0.82rem', color: 'var(--hi)', fontWeight: 600, marginTop: '2px' }}>Rank #{activeNode?.study_rank || 1}</p>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: 'var(--track-wide)' }}>Qdrant Partition</span>
+            <p style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: 600, marginTop: '2px' }}>Isolated (gRPC 6334)</p>
+          </div>
+          <div>
+            <span style={{ fontSize: '0.7rem', color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: 'var(--track-wide)' }}>Memory Tier</span>
+            <p style={{ fontSize: '0.82rem', color: 'var(--hi)', fontWeight: 600, marginTop: '2px' }}>&lt; 12.0 GB SLA</p>
           </div>
         </div>
 
-        {/* Footer Actions */}
-        {activeNode?.type === 'paper' && (
-          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.3)' }}>
-            <button
-              className={isPaperStaged ? 'btn-secondary' : 'btn-primary'}
-              style={{ width: '100%', fontSize: '0.85rem' }}
-              onClick={() => onStageToTray(activeNode.id)}
-            >
-              {isPaperStaged ? '✓ Staged in Council Tray' : '+ Stage in Council Tray'}
-            </button>
+        {/* Connected Relational Edges */}
+        <div style={{ marginBottom: 'auto' }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: 'var(--track-wide)', display: 'block', marginBottom: '8px' }}>
+            Connected Relational Graph ({connectedEdges.length})
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {connectedEdges.map(e => (
+              <div
+                key={e.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  background: 'rgba(200, 214, 226, 0.04)',
+                  border: '1px solid var(--line-faint)',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                <span style={{ color: 'var(--hi)' }}>{e.source} ➔ {e.target}</span>
+                <span style={{ color: 'var(--red)', fontWeight: 700 }}>{e.relation}</span>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+
+        {/* Action Buttons (Augma .btn.pri with corner brackets) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '24px' }}>
+          {activeNode?.type === 'paper' && (
+            <button
+              className={`btn-stark ${isPaperStaged ? '' : 'pri'}`}
+              onClick={() => onStageToTray && onStageToTray(activeNode.id)}
+              disabled={isPaperStaged}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              <Database size={14} />
+              {isPaperStaged ? 'Already Staged in Council Tray' : 'Stage to Council Tray'}
+            </button>
+          )}
+
+          <a
+            href={`https://arxiv.org/abs/${activeNode?.id?.replace('p_', '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-stark"
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            <ExternalLink size={14} /> View ArXiv Source Paper
+          </a>
+        </div>
       </div>
     </div>
   );
