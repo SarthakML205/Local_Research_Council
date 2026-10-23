@@ -23,7 +23,30 @@ The **Local Research Council (LRC)** is an offline academic research copilot and
 
 ---
 
-## 2. Core Capabilities & Architecture
+## 2. Interactive Feature Demos & Module Walkthroughs
+
+### 🎬 Demo 1: Paper Discovery & 3-Way Retrieval Strategy Benchmark
+> *Live query extraction, parallel evaluation across Strategy A (Regex), Strategy B (LLM Zero-Shot), and Strategy C (MLX Hybrid RRF + Cross-Encoder), candidate paper inspection, and Council Tray staging.*
+
+![Paper Discovery and Retrieval Strategy Benchmark](docs/assets/demos/01_paper_discovery_and_strategy_benchmark.webp)
+
+---
+
+### 🏛️ Demo 2: Autonomous Multi-Agent Debate Council
+> *Live dialectic debate in the Sovereign Chamber: J.A.R.V.I.S. Chancellor Dais, Stark AI Advocate Podiums (F.R.I.D.A.Y., E.D.I.T.H., K.A.R.E.N.), dynamic rebuttal chains, strict `< 2,048` prompt token knapsack meter, and consensus trade-off synthesis.*
+
+![Multi-Agent Debate Council](docs/assets/demos/02_multi_agent_debate_council.webp)
+
+---
+
+### 🌌 Demo 3: 3D Rotating Shelf, Operator Mind Map & Hardware M5 HUD
+> *3D perspective revolving paper carousel with methodology inspector, force-directed SVG relational mind map with typed edges and 8-tile extraction drawer, sovereign Bookshelf archive, and Apple Silicon M5 RAM & telemetry monitor.*
+
+![3D Rotating Shelf, Operator Mind Map & Hardware M5 HUD](docs/assets/demos/03_3d_shelf_mindmap_and_m5_hud.webp)
+
+---
+
+## 3. Core Capabilities & Architecture
 
 ### A. Domain-Constrained arXiv Search & Widen-and-Rerank Pipeline
 - **Boolean Query Extraction:** Maps raw research prompts into field-specific arXiv queries (e.g., `(ti:"KV cache" OR abs:"KV cache") AND (cat:cs.AI OR cat:cs.CL OR cat:cs.LG OR cat:cs.MA)`).
@@ -66,7 +89,7 @@ Inspired by high-density command portals and the Augma Imaginarium specification
 
 ---
 
-## 3. Repository Structure
+## 4. Repository Structure
 
 ```
 local_reserch_council/
@@ -107,7 +130,7 @@ local_reserch_council/
 
 ---
 
-## 4. Quickstart & Verification
+## 5. Quickstart & Verification
 
 ### Prerequisites
 - macOS on Apple Silicon (M-series, 24 GB+ recommended).
